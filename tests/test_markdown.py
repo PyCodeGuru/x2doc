@@ -19,9 +19,7 @@ def test_single_image_markdown_matches_golden(load_json: Any) -> None:
     document.media[0].local_path = "assets/001-deadbeef.jpg"
 
     actual = render_markdown(document)
-    expected = (Path(__file__).parent / "golden" / "single_image.md").read_text(
-        encoding="utf-8"
-    )
+    expected = (Path(__file__).parent / "golden" / "single_image.md").read_text(encoding="utf-8")
 
     assert actual == expected
     assert "\r" not in actual
@@ -49,7 +47,7 @@ def test_renderer_preserves_structured_blocks_and_linkifies_expanded_url(load_js
     assert "1. 第一步\n2. 第二步" in markdown
     assert "- 操作 A\n- 操作 B" in markdown
     assert '```json\n  {\n    "ok": true\n  }\n```' in markdown
-    assert "[https://example.com/long/article](https://example.com/long/article)" in markdown
+    assert "[example.com/long/article](https://example.com/long/article)" in markdown
 
 
 def test_chinese_long_text_markdown_matches_golden(load_json: Any) -> None:
@@ -68,5 +66,5 @@ def test_chinese_long_text_markdown_matches_golden(load_json: Any) -> None:
     assert actual == expected
     assert "https://t.co/" not in actual
     assert "metrics:" not in actual
-    assert "tags: [\"ClaudeCode\"]" in actual
+    assert 'tags: ["ClaudeCode"]' in actual
     assert "  \n> 抓取时间" not in actual

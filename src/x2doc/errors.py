@@ -27,6 +27,14 @@ class NetworkError(X2DocError):
     exit_code = 3
 
 
+class NetworkBlockedError(NetworkError):
+    """DNS succeeded but the source transport remains unreachable."""
+
+
+class AllFetchersFailedError(NetworkError):
+    """Every configured fetch path failed."""
+
+
 class DependencyError(X2DocError):
     """A required local dependency is not available."""
 

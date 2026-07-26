@@ -18,7 +18,7 @@ Testing something. Please RT
 
 ![图 1](assets/001-deadbeef.jpg)
 
----
+<!-- x2doc:source -->
 
 > 原文链接：[查看原文](https://x.com/apimctestface/status/1253775785153884161)
 > 抓取时间：2026-07-26T20:30:00+08:00

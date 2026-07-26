@@ -54,7 +54,7 @@ Syndication 的 `full_text` 不包含可靠的富文本块信息，因此由独�
 }
 ```
 
-版本匹配时直接读取 `document`。版本不匹配但 `raw` 可用时，根据显式维护的 `raw_kind → parser` 映射表选择当前 parser，重建 `document` 并原子更新缓存，不发起网络请求。首批映射为 `syndication_tweet → parse_syndication_tweet`、`fxtwitter_tweet → parse_mirror_tweet`、`vxtwitter_tweet → parse_mirror_tweet`、`playwright_tweet_dom → parse_tweet_dom`、`playwright_article_dom → parse_article_dom`。未知 `raw_kind` 视为缓存不可解析。只有缓存不存在、损坏、缺少可解析的 `raw`，或显式指定 `--refresh` 时才联网；`--refresh` 的行为在 README 中明确说明。
+版本匹配时直接读取 `document`。版本不匹配但 `raw` 可用时，根据显式维护的 `raw_kind → parser` 映射表选择当前 parser，重建 `document` 并原子更新缓存，不发起网络请求。首批映射为 `syndication_tweet → parse_syndication_tweet`、`fxtwitter_json → parse_fxtwitter_tweet`、`vxtwitter_json → parse_vxtwitter_tweet`、`playwright_tweet_dom → parse_tweet_dom`、`playwright_article_dom → parse_article_dom`。未知 `raw_kind` 视为缓存不可解析。只有缓存不存在、损坏、缺少可解析的 `raw`，或显式指定 `--refresh` 时才联网；`--refresh` 的行为在 README 中明确说明。
 
 缓存写入使用临时文件加原子替换，避免中断留下半文件。缓存损坏时保留原文件并给出可理解的告警，不静默吞掉问题。
 
@@ -74,7 +74,7 @@ Syndication 的 `full_text` 不包含可靠的富文本块信息，因此由独�
 
 ## 8. Markdown 与 PDF
 
-Markdown 渲染输出 UTF-8、LF、YAML front matter、thread 分隔标记和来源区块。front matter 固定增加 `schema_version`、`published_at_utc` 与 `fetch_path`，不写入 metrics；`published_at` 和 `fetched_at` 使用 Asia/Shanghai。来源区块由两条独立 `>` 行组成，不使用行尾双空格。中文清理只移除零宽字符并压缩多余空行，不强制插入中英文空格，不修改代码块内容。图片缺少说明时按出现顺序生成“图 N”。
+Markdown 渲染输出 UTF-8、LF、YAML front matter、thread 分隔标记和来源区块。front matter 固定增加 `schema_version`、`published_at_utc` 与 `fetch_path`，不写入 metrics；`published_at` 和 `fetched_at` 使用 Asia/Shanghai。来源区块前使用 `<!-- x2doc:source -->` 锚点，不插入易与正文混淆的 divider；区块由两条独立 `>` 行组成，不使用行尾双空格。正文 hashtag 保留原始 `#tag`，同时去重写入 front matter `tags`。中文清理只移除零宽字符并压缩多余空行，不强制插入中英文空格，不修改代码块内容。图片缺少说明时按出现顺序生成“图 N”。
 
 PDF 默认使用 markdown-it-py 生成 HTML，再由 Playwright Chromium 输出 A4 PDF。渲染前检测可用中文字体；未找到时停止并提供明确安装建议。图片转换为绝对 `file://` URL，CSS 控制分页、代码溢出、引用样式、页眉标题和页脚页码。
 

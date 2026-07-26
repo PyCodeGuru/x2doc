@@ -71,6 +71,12 @@ class DividerBlock(StrictModel):
     type: Literal["divider"] = "divider"
 
 
+class TableBlock(StrictModel):
+    type: Literal["table"] = "table"
+    headers: list[str]
+    rows: list[list[str]]
+
+
 Block = Annotated[
     ParagraphBlock
     | HeadingBlock
@@ -78,7 +84,8 @@ Block = Annotated[
     | QuoteBlock
     | CodeBlock
     | ImageBlock
-    | DividerBlock,
+    | DividerBlock
+    | TableBlock,
     Field(discriminator="type"),
 ]
 
@@ -114,3 +121,4 @@ class ConversionResult(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     fetch_path: str
     cache_path: Path
+    fetch_attempts: list[dict[str, str | int]] = Field(default_factory=list)

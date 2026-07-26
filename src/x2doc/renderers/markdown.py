@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlsplit
 
 from x2doc.cache import SCHEMA_VERSION
 from x2doc.models import (
@@ -16,6 +17,7 @@ from x2doc.models import (
     ListBlock,
     ParagraphBlock,
     QuoteBlock,
+    TableBlock,
 )
 
 _BARE_URL = re.compile(r"(?<!\]\()(https?://[^\s<>]+)")
@@ -38,7 +40,7 @@ def render_markdown(document: Document, *, front_matter: bool = True) -> str:
             sections.append(rendered)
 
     sections.append(
-        "---\n\n"
+        "<!-- x2doc:source -->\n\n"
         f"> 原文链接：[查看原文]({document.source_url})\n"
         f"> 抓取时间：{document.fetched_at.isoformat()}"
     )
@@ -85,6 +87,11 @@ def _render_block(block: Block, document: Document, image_number: int) -> str:
         return f"```{language}\n{block.text}\n```"
     if isinstance(block, DividerBlock):
         return "---"
+    if isinstance(block, TableBlock):
+        header = "| " + " | ".join(block.headers) + " |"
+        separator = "| " + " | ".join("---" for _ in block.headers) + " |"
+        rows = ["| " + " | ".join(row) + " |" for row in block.rows]
+        return "\n".join([header, separator, *rows])
     if isinstance(block, ImageBlock):
         media = next((item for item in document.media if item.id == block.media_id), None)
         if media is None:
@@ -96,7 +103,15 @@ def _render_block(block: Block, document: Document, image_number: int) -> str:
 
 
 def _linkify(text: str) -> str:
-    return _BARE_URL.sub(lambda match: f"[{match.group(1)}]({match.group(1)})", text)
+    def replace(match: re.Match[str]) -> str:
+        url = match.group(1)
+        parts = urlsplit(url)
+        label = f"{parts.netloc}{parts.path}"
+        if parts.query:
+            label += f"?{parts.query}"
+        return f"[{label}]({url})"
+
+    return _BARE_URL.sub(replace, text)
 
 
 def _extract_tags(document: Document) -> list[str]:

@@ -36,12 +36,12 @@ Claude Code 中文长文测试。
 
 ---
 
-参考一 [https://example.com/guide/start](https://example.com/guide/start)
-参考二 [https://docs.example.com/reference/configuration](https://docs.example.com/reference/configuration)
+参考一 [example.com/guide/start](https://example.com/guide/start)
+参考二 [docs.example.com/reference/configuration](https://docs.example.com/reference/configuration)
 
 #ClaudeCode
 
----
+<!-- x2doc:source -->
 
 > 原文链接：[查看原文](https://x.com/zh_author/status/2000000000000000001)
 > 抓取时间：2026-07-27T08:30:00+08:00

@@ -12,6 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "x2doc contributors" }]
 dependencies = [
   "httpx[socks]>=0.28,<1",
+  "beautifulsoup4>=4.13,<5",
   "markdown-it-py[linkify,plugins]>=4,<5",
   "playwright>=1.52,<2",
   "pydantic>=2.11,<3",
@@ -26,6 +27,7 @@ pdf-weasyprint = ["weasyprint>=65,<67"]
 dev = [
   "pytest>=8.4,<10",
   "pytest-httpx>=0.35,<1",
+  "pypdf>=6,<7",
   "ruff>=0.12,<1",
 ]
 

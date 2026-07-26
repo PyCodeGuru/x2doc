@@ -104,6 +104,10 @@ class SyndicationFetcher:
             raise RenderError("Syndication 返回的内容不是有效 JSON") from exc
         if not isinstance(payload, dict):
             raise RenderError("Syndication JSON 顶层不是对象")
+        if not isinstance(payload.get("id_str"), str):
+            raise RenderError("Syndication 响应为空或缺少推文标识")
+        if isinstance(payload.get("article"), dict):
+            raise RenderError("Syndication 只返回 Article 预览，需降级获取完整正文")
         return payload
 
     def _wait_seconds(self, retry_state: Any) -> float:
