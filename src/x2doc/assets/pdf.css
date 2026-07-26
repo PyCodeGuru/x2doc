@@ -1,0 +1,13 @@
+@page { size: A4; margin: 20mm 18mm; }
+html { font-family: "{{CJK_FONT}}", sans-serif; color: #202124; }
+body { margin: 0; font-size: 11pt; line-height: 1.75; overflow-wrap: anywhere; }
+main { width: 100%; }
+h1, h2, h3, h4 { line-height: 1.35; break-after: avoid; }
+a { color: #0969da; text-decoration: underline; }
+blockquote { margin-left: 0; padding-left: 1em; border-left: 3px solid #9aa0a6; color: #555; }
+pre { padding: 0.9em; border-radius: 7px; background: #f4f5f6; white-space: pre-wrap; overflow-wrap: anywhere; }
+code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+img, figure, table, pre, blockquote { break-inside: avoid; max-width: 100%; }
+img { height: auto; display: block; margin: 0.8em auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 0.35em 0.55em; }

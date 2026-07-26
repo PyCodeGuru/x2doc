@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from x2doc.app import build_output_dir, convert
-from x2doc.errors import DependencyError, ParameterError
+from x2doc.errors import ParameterError
 from x2doc.fetchers.base import FetchResult
 from x2doc.models import Document
 from x2doc.parsers.tweet_json import parse_syndication_tweet
@@ -147,9 +147,21 @@ def test_images_none_and_pdf_is_rejected_before_fetching(tmp_path: Path) -> None
         )
 
 
-def test_stage_one_rejects_pdf_with_dependency_guidance(tmp_path: Path) -> None:
-    with pytest.raises(DependencyError, match="阶段三"):
-        convert("https://x.com/user/status/1", formats=["pdf"], out=tmp_path)
+def test_convert_writes_pdf_output(tmp_path: Path, load_json, monkeypatch) -> None:
+    def fake_pdf(_markdown, *, output, **_kwargs):
+        output.write_bytes(b"%PDF-fixture")
+
+    monkeypatch.setattr("x2doc.app.render_pdf", fake_pdf)
+    result = convert(
+        "https://x.com/apimctestface/status/1253775785153884161",
+        formats=["pdf"],
+        out=tmp_path / "output",
+        cache_dir=tmp_path / "cache",
+        _fetcher=FixtureFetcher(load_json("syndication/single_image.json")),
+        _media_localizer=no_download,
+    )
+
+    assert result.outputs["pdf"].read_bytes() == b"%PDF-fixture"
 
 
 def test_convert_uses_injected_clock_for_fetched_at(tmp_path: Path, load_json) -> None:

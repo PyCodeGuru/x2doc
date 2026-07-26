@@ -1,14 +1,8 @@
 # x2doc
 
-`x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）内容转换为结构化 Markdown，后续阶段扩展 Article、thread 和 PDF。
+`x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）推文和 Article 转换为结构化 Markdown 与 A4 PDF。
 
-当前交付是阶段一垂直切片：
-
-```text
-单条公开推文 → Syndication → Document → 本地图片 → Markdown
-```
-
-阶段一的重点是冻结数据边界和可测试的纵向链路；FxTwitter/VxTwitter、Playwright Article、thread 和 PDF 尚未实现，详见“已知限制”。
+公开推文默认按 `cache,syndication,fxtwitter,vxtwitter,playwright` 降级；Article URL 直接进入 Playwright。抓取结果统一归一化为 `Document`，再输出 Markdown、HTML 中间表示与 PDF。
 
 ## 1. 安装
 
@@ -27,7 +21,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m ruff check .
 ```
 
-PDF 阶段将使用 Playwright Chromium；现在可以预先安装，但阶段一不会调用浏览器：
+PDF 与 Article 使用 Playwright Chromium，首次安装后执行：
 
 ```bash
 .venv/bin/playwright install chromium
@@ -47,10 +41,10 @@ x2doc 'https://x.com/apimctestface/status/1253775785153884161' \
   --images local
 ```
 
-阶段一已接入的主要选项：
+主要选项：
 
 ```text
---format md                    当前阶段只支持 md
+--format md|pdf|md,pdf|all
 --out DIR                      默认 ./output
 --images local|embed|none      默认 local
 --front-matter/--no-front-matter
@@ -59,9 +53,11 @@ x2doc 'https://x.com/apimctestface/status/1253775785153884161' \
 --lang zh|en                   默认 zh
 --verbose                      显示诊断上下文
 --proxy URL                    HTTP/HTTPS/SOCKS5 代理
+--fetch-order PATHS            默认 cache,syndication,fxtwitter,vxtwitter,playwright
+--cookies PATH                 JSON 或 Netscape cookies 文件
 ```
 
-`--images none` 与包含 PDF 的格式始终互斥，并在联网前以退出码 1 拒绝。阶段一传入 PDF 会以退出码 4 明确提示该依赖链尚未交付。
+`--images none` 与包含 PDF 的格式始终互斥，并在联网前以退出码 1 拒绝。
 
 ## 3. Python API
 
@@ -72,7 +68,7 @@ from x2doc import convert
 
 result = convert(
     "https://x.com/apimctestface/status/1253775785153884161",
-    formats=["md"],
+    formats=["md", "pdf"],
 )
 print(result.outputs["md"])
 print(result.fetch_path)
@@ -85,6 +81,7 @@ print(result.fetch_path)
 ```text
 output/{handle}-{YYYYMMDD}-{slug}/
 ├── index.md
+├── index.pdf
 └── assets/
 ```
 
@@ -111,9 +108,11 @@ Tweet 标题规则固定为：展开链接并移除零宽字符后，取第一�
 
 Markdown front matter 固定包含 `schema_version`、`title`、`author`、`handle`、`source_url`、`published_at`、`published_at_utc`、`fetched_at`、`fetch_path`、`lang`、图片/thread 数量与 `tags`。`metrics` 保留在 `Document` 中，但不写入 front matter。`published_at` 与 `fetched_at` 统一使用 Asia/Shanghai，`published_at_utc` 单独保留 UTC。
 
-来源区块使用两条独立引用行，不依赖 Markdown 行尾双空格：
+来源区块使用专用锚点与两条独立引用行，不依赖 Markdown 行尾双空格，也不与正文 divider 混淆：
 
 ```markdown
+<!-- x2doc:source -->
+
 > 原文链接：[查看原文](https://x.com/...)
 > 抓取时间：2026-07-27T08:30:00+08:00
 ```
@@ -150,12 +149,13 @@ Markdown front matter 固定包含 `schema_version`、`title`、`author`、`hand
 
 默认测试不访问网络，网络 smoke test 被 `network` marker 排除。
 
-显式刷新 Syndication fixture：
+显式通过代理刷新 Syndication fixture（同时记录来源 URL、UTC 抓取时间和响应 SHA-256）：
 
 ```bash
-.venv/bin/python scripts/refresh_fixture.py \
+.venv/bin/python scripts/refresh_fixtures.py \
   'https://x.com/apimctestface/status/1253775785153884161' \
   tests/fixtures/syndication/single_image.json \
+  --proxy 'http://127.0.0.1:7892' \
   --overwrite
 ```
 
@@ -181,7 +181,7 @@ tests/golden/chinese_long_text.md
 
 Golden 的 `fetched_at` 来自 `.meta.json` 的 `golden_fetched_at`；真实转换默认取 fetcher 成功时的真实时钟。Python API 测试可通过 `clock=lambda: fixed_datetime` 注入固定时间，渲染器本身不读取或硬编码当前时间。
 
-两个脚本默认拒绝覆盖，必须显式传入 `--overwrite`。当前开发环境直连 Syndication TCP 超时，首个 fixture 使用可追溯的公共仓库真实响应快照；来源 commit、原始 SHA-256 和失败证据记录在对应 `.meta.json`。
+两个脚本默认拒绝覆盖，必须显式传入 `--overwrite`。fixture 刷新只写 parser 字段白名单；Cookie、token、请求头和跟踪字段不会入库。
 
 如需主动运行网络 smoke test：
 
@@ -197,20 +197,25 @@ Golden 的 `fetched_at` 来自 `.meta.json` 的 `golden_fetched_at`；真实转�
 | 1 | 参数或输出冲突 | 非 X URL、非法选项、目录已存在 |
 | 2 | 内容不可访问 | 删除、受保护、需要登录 |
 | 3 | 网络错误 | 超时、DNS、限流重试耗尽 |
-| 4 | 本地依赖缺失 | 当前阶段未交付的 Playwright/PDF 路径 |
+| 4 | 本地依赖缺失 | Chromium 或中文字体缺失 |
 | 5 | 解析或渲染失败 | 上游字段变化、无法生成文档 |
 
 ## 9. Cookie 说明
 
-阶段一不读取 Cookie。阶段二将支持 Chrome 的 Cookie-Editor 等扩展导出的 JSON 或 Netscape 格式，并只注入 X 所需的 `auth_token` 与 `ct0`。不要把 Cookie 文件提交到仓库或复制到日志中；受保护账号仍要求当前登录账号具备访问权限。
+支持 Cookie-Editor 等扩展导出的 JSON，以及 Netscape cookies.txt；只注入 X 所需的 `auth_token` 与 `ct0`。日志只输出文件路径与加载条目数，不输出值。不要把 Cookie 文件提交到仓库；受保护账号仍要求当前登录账号具备访问权限。
+
+Chrome 导出步骤：登录 `x.com` → 安装并打开 Cookie-Editor → Export → 选择 JSON（或 Netscape）→ 保存到仓库外的私有路径，然后传入：
+
+```bash
+x2doc 'https://x.com/i/article/ARTICLE_ID' --cookies /secure/path/x-cookies.json
+```
 
 ## 10. 已知限制
 
-- 当前只完成公开单条推文的 Syndication 垂直切片。
-- Article 会直接路由到 Playwright，但浏览器 fetcher 在阶段二实现。
-- 免登录 thread 未来只支持向上回溯父链；向下补全仅在 Playwright + cookies 下实现。
+- Article 直接路由到 Playwright；X 若向免登录浏览器返回登录壳，会以退出码 2 提示提供 cookies，不会把壳页面伪装成正文。
+- 免登录 thread 只承诺向上回溯父链；向下补全仅允许在 Playwright + cookies 下进行。
 - 免登录只取得单条时，CLI 会显式提示使用 `--cookies PATH`。
-- PDF、中文字体检测、页眉页脚和 WeasyPrint optional extra 的运行路径在阶段三实现。
+- PDF 使用 Chromium，渲染前检测 PingFang SC / Noto Sans CJK SC / Source Han Sans SC；WeasyPrint 仍仅为 optional extra。
 - 视频正文、投票和第三方嵌入尚未处理；未来可能降级为封面或链接。
 - X 公开接口字段与页面 DOM 会变化；解析快照和 fetcher 契约测试用于尽早暴露变化。
 

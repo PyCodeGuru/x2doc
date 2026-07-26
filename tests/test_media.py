@@ -67,9 +67,7 @@ def test_embed_and_none_modes(tmp_path: Path, httpx_mock) -> None:
     content = b"png"
     httpx_mock.add_response(content=content, headers={"Content-Type": "image/png"})
 
-    embedded, warnings = localize_media(
-        _document(["https://example.com/image"]), tmp_path, "embed"
-    )
+    embedded, warnings = localize_media(_document(["https://example.com/image"]), tmp_path, "embed")
     untouched, none_warnings = localize_media(
         _document(["https://example.com/not-requested"]), tmp_path, "none"
     )
@@ -113,3 +111,18 @@ def test_download_concurrency_never_exceeds_five(tmp_path: Path, httpx_mock) -> 
     localize_media(_document(urls), tmp_path, "local")
 
     assert maximum == 5
+
+
+def test_existing_assets_are_reused_without_network(tmp_path: Path, httpx_mock) -> None:
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    existing = assets / "001-deadbeef.jpg"
+    existing.write_bytes(b"cached")
+
+    document, warnings = localize_media(
+        _document(["https://pbs.twimg.com/unreachable.jpg"]), tmp_path, "local"
+    )
+
+    assert document.media[0].local_path == "assets/001-deadbeef.jpg"
+    assert warnings == []
+    assert httpx_mock.get_requests() == []

@@ -12,6 +12,7 @@ from typer._click.exceptions import UsageError
 from typer.core import TyperCommand
 
 from x2doc.app import convert
+from x2doc.cookies import load_cookies
 from x2doc.errors import ParameterError, X2DocError
 
 app = typer.Typer(
@@ -55,9 +56,7 @@ def main(
     url: Annotated[str, typer.Argument(help="X/Twitter 推文或 Article 链接")],
     format_: Annotated[str, typer.Option("--format", help="md / pdf / md,pdf / all")] = "md",
     out: Annotated[Path, typer.Option("--out", help="输出根目录")] = _DEFAULT_OUTPUT,
-    thread: Annotated[
-        bool | None, typer.Option("--thread/--no-thread", help="补全 thread")
-    ] = None,
+    thread: Annotated[bool | None, typer.Option("--thread/--no-thread", help="补全 thread")] = None,
     images: Annotated[str, typer.Option("--images", help="embed / local / none")] = "local",
     pdf_engine: Annotated[
         str, typer.Option("--pdf-engine", help="playwright / weasyprint")
@@ -71,6 +70,10 @@ def main(
         str | None,
         typer.Option("--proxy", help="HTTP/HTTPS/SOCKS5 代理地址"),
     ] = None,
+    fetch_order: Annotated[
+        str,
+        typer.Option("--fetch-order", help="逗号分隔的抓取降级顺序"),
+    ] = "cache,syndication,fxtwitter,vxtwitter,playwright",
     lang: Annotated[str, typer.Option("--lang", help="zh / en")] = "zh",
     overwrite: Annotated[bool, typer.Option("--overwrite", help="覆盖已知输出文件")] = False,
     refresh: Annotated[bool, typer.Option("--refresh", help="忽略缓存并重新抓取")] = False,
@@ -91,6 +94,8 @@ def main(
 
     thread_mode = "auto" if thread is None else ("on" if thread else "off")
     try:
+        if verbose and cookies is not None:
+            typer.echo(f"Cookies: {cookies}（加载 {len(load_cookies(cookies))} 条）")
         result = convert(
             url,
             formats=formats,
@@ -103,6 +108,7 @@ def main(
             thread=thread_mode,
             cookies=cookies,
             proxy=proxy,
+            fetch_order=fetch_order,
         )
     except X2DocError as exc:
         if verbose:
@@ -119,6 +125,13 @@ def main(
         typer.echo(f"{kind.upper()}: {path}")
     for warning in result.warnings:
         typer.echo(f"警告: {warning}")
+    if verbose and result.fetch_attempts:
+        typer.echo("抓取尝试:")
+        for attempt in result.fetch_attempts:
+            typer.echo(
+                f"- {attempt['path']}: {attempt['status']} "
+                f"({attempt['elapsed_ms']}ms) {attempt.get('reason', '')}".rstrip()
+            )
 
 
 def _exit_with(error: X2DocError) -> None:

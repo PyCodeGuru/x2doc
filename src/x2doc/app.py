@@ -22,15 +22,22 @@ from x2doc.cache import (
 )
 from x2doc.errors import DependencyError, ParameterError
 from x2doc.fetchers.base import FetchResult
+from x2doc.fetchers.mirror import MirrorFetcher
+from x2doc.fetchers.pipeline import FetchPipeline
+from x2doc.fetchers.playwright import PlaywrightArticleFetcher
 from x2doc.fetchers.syndication import SyndicationFetcher
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
 from x2doc.network import resolve_proxy
+from x2doc.parsers.article_dom import parse_article_dom
+from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
 from x2doc.parsers.tweet_json import parse_syndication_tweet
 from x2doc.renderers.markdown import render_markdown
+from x2doc.renderers.pdf import render_pdf
 from x2doc.routing import Route, resolve_route
 
 ThreadMode = Literal["auto", "on", "off"]
+DEFAULT_FETCH_ORDER = ("cache", "syndication", "fxtwitter", "vxtwitter", "playwright")
 
 
 class Fetcher(Protocol):
@@ -54,6 +61,7 @@ def convert(
     thread: ThreadMode = "auto",
     cookies: str | Path | None = None,
     proxy: str | None = None,
+    fetch_order: Sequence[str] | str = DEFAULT_FETCH_ORDER,
     cache_dir: str | Path | None = None,
     clock: Clock | None = None,
     _fetcher: Fetcher | None = None,
@@ -64,13 +72,7 @@ def convert(
     requested_formats = _normalize_formats(formats)
     if images == "none" and "pdf" in requested_formats:
         raise ParameterError("--images none 与 PDF 输出互斥，请改用 local 或 embed")
-    if "pdf" in requested_formats:
-        raise DependencyError("PDF 将在阶段三实现；阶段一仅支持 Markdown")
-
     route = resolve_route(url)
-    if route.kind == "article":
-        raise DependencyError("Article 的 Playwright 抓取将在阶段二实现")
-
     cache_root = Path(cache_dir) if cache_dir is not None else default_cache_dir()
     resolved_cache_path = cache_path(cache_root, route)
     document = None
@@ -81,16 +83,45 @@ def convert(
             source_url=route.canonical_url,
         )
 
+    attempts: list[dict[str, str | int]] = (
+        [{"path": "cache", "status": "success", "elapsed_ms": 0, "reason": ""}]
+        if document is not None
+        else []
+    )
     if document is None:
         proxy_config = resolve_proxy(proxy)
-        fetcher = _fetcher or SyndicationFetcher(proxy=proxy_config)
-        fetched = fetcher.fetch(route, lang)
+        if _fetcher is not None:
+            fetched = _fetcher.fetch(route, lang)
+        else:
+            order = _normalize_fetch_order(fetch_order, route)
+            pipeline = FetchPipeline(
+                {
+                    "syndication": SyndicationFetcher(proxy=proxy_config),
+                    "fxtwitter": MirrorFetcher("fxtwitter", proxy=proxy_config),
+                    "vxtwitter": MirrorFetcher("vxtwitter", proxy=proxy_config),
+                    "playwright": PlaywrightArticleFetcher(proxy=proxy_config, cookies=cookies),
+                }
+            )
+            fetched, recorded = pipeline.fetch(route, lang, order)
+            attempts = [
+                {
+                    "path": item.path,
+                    "status": item.status,
+                    "elapsed_ms": item.elapsed_ms,
+                    "reason": item.reason,
+                }
+                for item in recorded
+            ]
         fetched_at = clock() if clock is not None else fetched.fetched_at
-        document = parse_syndication_tweet(
-            fetched.raw,
-            source_url=route.canonical_url,
-            fetched_at=fetched_at,
-        )
+        parser = {
+            "syndication_tweet": parse_syndication_tweet,
+            "fxtwitter_json": parse_fxtwitter_tweet,
+            "vxtwitter_json": parse_vxtwitter_tweet,
+            "playwright_article_dom": parse_article_dom,
+        }.get(fetched.raw_kind)
+        if parser is None:
+            raise DependencyError(f"没有可用 parser: {fetched.raw_kind}")
+        document = parser(fetched.raw, route.canonical_url, fetched_at)
         write_cache(
             resolved_cache_path,
             CacheEnvelope(
@@ -122,12 +153,24 @@ def convert(
         )
     if thread != "off" and cookies is None:
         warnings.append("当前仅获取到单条推文；如需补全 thread，请提供 --cookies PATH。")
+    elif thread != "off" and cookies is not None and not localized.thread:
+        warnings.append("未能从当前 conversation 补全 thread；请确认 cookies 有效且具备访问权限。")
 
     outputs: dict[str, Path] = {}
     if "md" in requested_formats:
         markdown_path = output_dir / "index.md"
         _atomic_write_text(markdown_path, render_markdown(localized, front_matter=front_matter))
         outputs["md"] = markdown_path
+    if "pdf" in requested_formats:
+        pdf_path = output_dir / "index.pdf"
+        render_pdf(
+            render_markdown(localized, front_matter=False),
+            title=localized.title,
+            output=pdf_path,
+            base_dir=output_dir,
+            proxy=resolve_proxy(proxy),
+        )
+        outputs["pdf"] = pdf_path
 
     return ConversionResult(
         output_dir=output_dir,
@@ -135,7 +178,18 @@ def convert(
         warnings=warnings,
         fetch_path=document.fetch_path,
         cache_path=resolved_cache_path,
+        fetch_attempts=attempts,
     )
+
+
+def _normalize_fetch_order(value: Sequence[str] | str, route: Route) -> tuple[str, ...]:
+    items = value.split(",") if isinstance(value, str) else value
+    requested = tuple(item.strip().lower() for item in items if item.strip().lower() != "cache")
+    allowed = set(route.fetch_paths)
+    normalized = tuple(item for item in requested if item in allowed)
+    if not normalized:
+        raise ParameterError("当前链接没有可用的抓取路径")
+    return normalized
 
 
 def build_output_dir(root: Path, document: Document) -> Path:

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup, Tag
 
-from x2doc.errors import RenderError
+from x2doc.errors import InaccessibleError, RenderError
 from x2doc.models import (
     Author,
     CodeBlock,
@@ -37,6 +37,11 @@ def parse_article_dom(raw: dict[str, Any], source_url: str, fetched_at: datetime
     title = (
         title_node.get_text(" ", strip=True) if title_node else str(raw.get("title") or "Article")
     )
+    if title.strip().lower().rstrip(".") in {
+        "javascript is not available",
+        "happening now",
+    }:
+        raise InaccessibleError("Article 页面拒绝免登录访问，请提供 --cookies PATH")
     blocks, media = [], []
     candidates = root.find_all(
         ["h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "blockquote", "pre", "img", "table"]

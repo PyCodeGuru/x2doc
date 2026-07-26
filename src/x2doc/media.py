@@ -55,6 +55,16 @@ def localize_media(
     if mode == "none" or not localized.media:
         return localized, []
 
+    # An overwrite from a cache hit must remain renderable while offline.
+    # Reuse the deterministic assets from the same output directory when all
+    # expected media files are already present.
+    if mode == "local":
+        existing = sorted((output_dir / "assets").glob("[0-9][0-9][0-9]-*"))
+        if len(existing) >= len(localized.media):
+            for media, path in zip(localized.media, existing, strict=False):
+                media.local_path = path.relative_to(output_dir).as_posix()
+            return localized, []
+
     proxy_config = proxy if isinstance(proxy, ProxyConfig) else resolve_proxy(proxy)
     downloads = _run_coroutine(lambda: _download_all(localized.media, proxy=proxy_config))
     media_by_id = {item.id: item for item in localized.media}
@@ -65,9 +75,7 @@ def localize_media(
     for download in downloads:
         media = media_by_id[download.media_id]
         if download.content is None:
-            warnings.append(
-                f"图片下载失败，Markdown 将回退为远程 URL: {media.original_url}"
-            )
+            warnings.append(f"图片下载失败，Markdown 将回退为远程 URL: {media.original_url}")
             continue
         content_type = download.content_type or "application/octet-stream"
         if mode == "embed":

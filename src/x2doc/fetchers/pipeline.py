@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from x2doc.errors import AllFetchersFailedError
+from x2doc.errors import AllFetchersFailedError, InaccessibleError
 from x2doc.fetchers.base import FetchResult
 from x2doc.routing import Route
 
@@ -31,6 +31,7 @@ class FetchPipeline:
         self, route: Route, lang: str, order: tuple[str, ...]
     ) -> tuple[FetchResult, list[FetchAttempt]]:
         attempts: list[FetchAttempt] = []
+        inaccessible: InaccessibleError | None = None
         for path in order:
             fetcher = self.fetchers.get(path)
             if fetcher is None:
@@ -40,6 +41,8 @@ class FetchPipeline:
             try:
                 result = fetcher.fetch(route, lang)
             except Exception as exc:
+                if isinstance(exc, InaccessibleError):
+                    inaccessible = exc
                 attempts.append(
                     FetchAttempt(
                         path,
@@ -53,5 +56,8 @@ class FetchPipeline:
                 FetchAttempt(path, "success", round((time.monotonic() - started) * 1000))
             )
             return result, attempts
+        failed = [item for item in attempts if item.status == "failed"]
+        if inaccessible is not None and len(failed) == 1:
+            raise inaccessible
         summary = "; ".join(f"{item.path}: {item.reason}" for item in attempts)
         raise AllFetchersFailedError(f"所有抓取路径均失败：{summary}")
