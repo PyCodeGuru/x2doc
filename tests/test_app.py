@@ -115,6 +115,23 @@ def test_build_output_dir_uses_unicode_slug_and_empty_fallback(tmp_path: Path, l
     assert fallback_path.name.endswith("tweet-1253775785153884161")
 
 
+def test_fixture_titles_drive_unicode_and_fallback_output_dirs(tmp_path: Path, load_json) -> None:
+    fetched_at = datetime(2026, 7, 27, tzinfo=UTC)
+    chinese = parse_syndication_tweet(
+        load_json("syndication/chinese_title.json"),
+        "https://x.com/title_author/status/2000000000000000002",
+        fetched_at,
+    )
+    symbol = parse_syndication_tweet(
+        load_json("syndication/symbol_title.json"),
+        "https://x.com/symbol_author/status/2000000000000000003",
+        fetched_at,
+    )
+
+    assert build_output_dir(tmp_path, chinese).name.endswith("深入理解中文标题")
+    assert build_output_dir(tmp_path, symbol).name.endswith("tweet-2000000000000000003")
+
+
 def test_images_none_and_pdf_is_rejected_before_fetching(tmp_path: Path) -> None:
     class FailingFetcher:
         def fetch(self, *_args, **_kwargs):
@@ -133,3 +150,21 @@ def test_images_none_and_pdf_is_rejected_before_fetching(tmp_path: Path) -> None
 def test_stage_one_rejects_pdf_with_dependency_guidance(tmp_path: Path) -> None:
     with pytest.raises(DependencyError, match="阶段三"):
         convert("https://x.com/user/status/1", formats=["pdf"], out=tmp_path)
+
+
+def test_convert_uses_injected_clock_for_fetched_at(tmp_path: Path, load_json) -> None:
+    fetcher = FixtureFetcher(load_json("syndication/chinese_title.json"))
+    fixed = datetime(2026, 7, 27, 9, 45, tzinfo=UTC)
+
+    result = convert(
+        "https://x.com/title_author/status/2000000000000000002",
+        out=tmp_path / "output",
+        cache_dir=tmp_path / "cache",
+        images="none",
+        thread="off",
+        _fetcher=fetcher,
+        clock=lambda: fixed,
+    )
+
+    markdown = result.outputs["md"].read_text(encoding="utf-8")
+    assert 'fetched_at: "2026-07-27T17:45:00+08:00"' in markdown

@@ -1,0 +1,19 @@
+{
+  "lang": "zh",
+  "created_at": "2026-07-26T01:02:03.000Z",
+  "id_str": "2000000000000000002",
+  "text": "深入理解中文标题。",
+  "user": {
+    "id_str": "1002",
+    "name": "标题作者",
+    "screen_name": "title_author"
+  },
+  "entities": {
+    "hashtags": [],
+    "urls": [],
+    "user_mentions": [],
+    "symbols": [],
+    "media": []
+  },
+  "mediaDetails": []
+}

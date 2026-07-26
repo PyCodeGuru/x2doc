@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
@@ -36,6 +37,7 @@ class Fetcher(Protocol):
 
 
 MediaLocalizer = Callable[[Document, Path, str], tuple[Document, list[str]]]
+Clock = Callable[[], datetime]
 
 
 def convert(
@@ -51,6 +53,7 @@ def convert(
     thread: ThreadMode = "auto",
     cookies: str | Path | None = None,
     cache_dir: str | Path | None = None,
+    clock: Clock | None = None,
     _fetcher: Fetcher | None = None,
     _media_localizer: MediaLocalizer | None = None,
 ) -> ConversionResult:
@@ -79,10 +82,11 @@ def convert(
     if document is None:
         fetcher = _fetcher or SyndicationFetcher()
         fetched = fetcher.fetch(route, lang)
+        fetched_at = clock() if clock is not None else fetched.fetched_at
         document = parse_syndication_tweet(
             fetched.raw,
             source_url=route.canonical_url,
-            fetched_at=fetched.fetched_at,
+            fetched_at=fetched_at,
         )
         write_cache(
             resolved_cache_path,
@@ -91,7 +95,7 @@ def convert(
                 route=route.kind,
                 fetch_path=fetched.fetch_path,
                 raw_kind=fetched.raw_kind,
-                fetched_at=fetched.fetched_at,
+                fetched_at=document.fetched_at,
                 raw=fetched.raw,
                 document=document.model_dump(mode="json"),
             ),

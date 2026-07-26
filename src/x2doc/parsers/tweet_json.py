@@ -13,6 +13,7 @@ from x2doc.parsers.plaintext_blocks import parse_plaintext_blocks
 
 _ZERO_WIDTH = str.maketrans("", "", "\u200b\u200c\u200d\ufeff")
 _SENTENCE_END = re.compile(r"[。！？.!?]")
+_TITLE_TRAILING_PUNCTUATION = "。！？.!?；;，,：:"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
@@ -28,8 +29,11 @@ def derive_tweet_title(text: str, tweet_id: str, media_urls: set[str]) -> str:
         return f"tweet-{tweet_id}"
     sentence_end = _SENTENCE_END.search(first_line)
     if sentence_end and sentence_end.end() <= 80:
-        return first_line[: sentence_end.end()]
-    return first_line[:80]
+        candidate = first_line[: sentence_end.end()]
+    else:
+        candidate = first_line[:80]
+    candidate = candidate.rstrip().rstrip(_TITLE_TRAILING_PUNCTUATION).rstrip()
+    return candidate or f"tweet-{tweet_id}"
 
 
 def parse_syndication_tweet(
@@ -80,7 +84,7 @@ def parse_syndication_tweet(
         title=derive_tweet_title(expanded_text, tweet_id, media_short_urls),
         published_at=published_utc.astimezone(_SHANGHAI),
         published_at_utc=published_utc,
-        fetched_at=fetched_at,
+        fetched_at=fetched_at.astimezone(_SHANGHAI),
         lang=_optional_string(raw.get("lang")) or "und",
         blocks=blocks,
         media=media,

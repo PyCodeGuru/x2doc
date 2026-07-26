@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from tenacity import Retrying, retry_if_exception_type, stop_after_attempt
@@ -15,6 +17,7 @@ from x2doc.fetchers.base import HTTP_TIMEOUT_SECONDS, USER_AGENT, FetchResult
 from x2doc.routing import Route
 
 _ENDPOINT = "https://cdn.syndication.twimg.com/tweet-result"
+_SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
 class _RetryableFetchError(Exception):
@@ -27,9 +30,16 @@ class _RetryableFetchError(Exception):
 class SyndicationFetcher:
     """Fetch one tweet, retrying only failures that can reasonably recover."""
 
-    def __init__(self, *, client: httpx.Client | None = None, wait: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        client: httpx.Client | None = None,
+        wait: bool = True,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._client = client
         self._wait = wait
+        self._clock = clock or _utc_now
 
     def fetch(self, route: Route, lang: str) -> FetchResult:
         if route.kind != "tweet":
@@ -62,7 +72,7 @@ class SyndicationFetcher:
             route=route,
             fetch_path="syndication",
             raw_kind="syndication_tweet",
-            fetched_at=datetime.now(UTC),
+            fetched_at=self._clock().astimezone(_SHANGHAI),
             raw=raw,
         )
 
@@ -119,3 +129,7 @@ def _parse_retry_after(value: str | None) -> float | None:
         if target.tzinfo is None:
             target = target.replace(tzinfo=UTC)
         return max(0.0, (target - datetime.now(UTC)).total_seconds())
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)

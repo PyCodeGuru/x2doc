@@ -1,0 +1,19 @@
+{
+  "lang": "zh",
+  "created_at": "2026-07-26T01:02:03.000Z",
+  "id_str": "2000000000000000003",
+  "text": "😀✨！！！",
+  "user": {
+    "id_str": "1003",
+    "name": "符号作者",
+    "screen_name": "symbol_author"
+  },
+  "entities": {
+    "hashtags": [],
+    "urls": [],
+    "user_mentions": [],
+    "symbols": [],
+    "media": []
+  },
+  "mediaDetails": []
+}

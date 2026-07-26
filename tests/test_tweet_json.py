@@ -6,7 +6,14 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from x2doc.models import ImageBlock, ParagraphBlock
+from x2doc.models import (
+    CodeBlock,
+    DividerBlock,
+    HeadingBlock,
+    ImageBlock,
+    ListBlock,
+    ParagraphBlock,
+)
 from x2doc.parsers.tweet_json import derive_tweet_title, parse_syndication_tweet
 
 
@@ -24,12 +31,14 @@ def test_parse_single_image_syndication_fixture(load_json: Any) -> None:
     assert document.author.handle == "apimctestface"
     assert document.author.display_name == "API McTestface"
     assert document.author.profile_url == "https://x.com/apimctestface"
-    assert document.title == "Testing something."
+    assert document.title == "Testing something"
     assert document.published_at_utc == datetime(2020, 4, 24, 20, 0, 15, tzinfo=UTC)
     assert document.published_at == datetime(
         2020, 4, 25, 4, 0, 15, tzinfo=ZoneInfo("Asia/Shanghai")
     )
-    assert document.fetched_at == fetched_at
+    assert document.fetched_at == datetime(
+        2026, 7, 26, 20, 30, tzinfo=ZoneInfo("Asia/Shanghai")
+    )
     assert document.lang == "en"
     assert document.metrics == {"likes": 5, "replies": 4}
     assert document.fetch_path == "syndication"
@@ -74,8 +83,8 @@ def test_parser_expands_non_media_tco_links() -> None:
 @pytest.mark.parametrize(
     ("text", "media_urls", "expected"),
     [
-        ("第一句。第二句", set(), "第一句。"),
-        ("Question? More", set(), "Question?"),
+        ("第一句。第二句", set(), "第一句"),
+        ("Question? More", set(), "Question"),
         ("A" * 81, set(), "A" * 80),
         ("\u200b https://t.co/image ", {"https://t.co/image"}, "tweet-7"),
     ],
@@ -84,3 +93,51 @@ def test_derive_tweet_title_is_deterministic(
     text: str, media_urls: set[str], expected: str
 ) -> None:
     assert derive_tweet_title(text, "7", media_urls) == expected
+
+
+def test_chinese_long_text_fixture_has_expected_lossy_blocks(load_json: Any) -> None:
+    raw = load_json("syndication/chinese_long_text.json")
+
+    document = parse_syndication_tweet(
+        raw,
+        source_url="https://x.com/zh_author/status/2000000000000000001",
+        fetched_at=datetime(2026, 7, 27, 0, 30, tzinfo=UTC),
+    )
+
+    assert document.title == "Claude Code 中文长文测试"
+    assert document.blocks == [
+        ParagraphBlock(text="Claude Code 中文长文测试。"),
+        HeadingBlock(level=2, text="核心概念"),
+        ListBlock(type="bullet_list", items=["准备目录", "检查权限"]),
+        ListBlock(type="ordered_list", items=["打开终端", "编辑配置"]),
+        CodeBlock(
+            language="json",
+            text='{\n  "permissions": {\n    "allow": ["Read"]\n  }\n}',
+        ),
+        ParagraphBlock(text="配置文件 `~/.claude/settings.json`"),
+        DividerBlock(),
+        ParagraphBlock(
+            text=(
+                "参考一 https://example.com/guide/start\n"
+                "参考二 https://docs.example.com/reference/configuration"
+            )
+        ),
+        ParagraphBlock(text="#ClaudeCode"),
+    ]
+
+
+def test_chinese_and_symbol_titles_are_derived_from_fixtures(load_json: Any) -> None:
+    fetched_at = datetime(2026, 7, 27, tzinfo=UTC)
+    chinese = parse_syndication_tweet(
+        load_json("syndication/chinese_title.json"),
+        "https://x.com/title_author/status/2000000000000000002",
+        fetched_at,
+    )
+    symbol = parse_syndication_tweet(
+        load_json("syndication/symbol_title.json"),
+        "https://x.com/symbol_author/status/2000000000000000003",
+        fetched_at,
+    )
+
+    assert chinese.title == "深入理解中文标题"
+    assert symbol.title == "😀✨"

@@ -106,7 +106,16 @@ Syndication 只提供 `text/full_text`，没有可靠的原始富文本结构。
 
 这些规则由 `tests/fixtures/plaintext/blocks.json` 快照固定。代码块之外会移除零宽字符；不会强制插入中英文空格。
 
-Tweet 标题规则固定为：展开链接并移除零宽字符后，取第一个非空逻辑行，去掉纯媒体短链；优先截到首个中英文句末标点，否则截到 80 个 Unicode 字符；结果为空则使用 `tweet-{id}`。
+Tweet 标题规则固定为：展开链接并移除零宽字符后，取第一个非空逻辑行，去掉纯媒体短链；优先截到首个中英文句末标点，否则截到 80 个 Unicode 字符；标题末尾的中英文标点会被移除。标题为空时使用 `tweet-{id}`；标题是纯符号或纯 emoji 时保留标题，但 slug 为空，因此输出目录回退为 `tweet-{id}`。
+
+Markdown front matter 固定包含 `schema_version`、`title`、`author`、`handle`、`source_url`、`published_at`、`published_at_utc`、`fetched_at`、`fetch_path`、`lang`、图片/thread 数量与 `tags`。`metrics` 保留在 `Document` 中，但不写入 front matter。`published_at` 与 `fetched_at` 统一使用 Asia/Shanghai，`published_at_utc` 单独保留 UTC。
+
+来源区块使用两条独立引用行，不依赖 Markdown 行尾双空格：
+
+```markdown
+> 原文链接：[查看原文](https://x.com/...)
+> 抓取时间：2026-07-27T08:30:00+08:00
+```
 
 ## 6. 缓存与离线重解析
 
@@ -162,6 +171,15 @@ git diff -- tests/fixtures tests/golden
 .venv/bin/python -m pytest tests/test_tweet_json.py tests/test_markdown.py -q
 ```
 
+中文长文本结构样本位于：
+
+```text
+tests/fixtures/syndication/chinese_long_text.json
+tests/golden/chinese_long_text.md
+```
+
+Golden 的 `fetched_at` 来自 `.meta.json` 的 `golden_fetched_at`；真实转换默认取 fetcher 成功时的真实时钟。Python API 测试可通过 `clock=lambda: fixed_datetime` 注入固定时间，渲染器本身不读取或硬编码当前时间。
+
 两个脚本默认拒绝覆盖，必须显式传入 `--overwrite`。当前开发环境直连 Syndication TCP 超时，首个 fixture 使用可追溯的公共仓库真实响应快照；来源 commit、原始 SHA-256 和失败证据记录在对应 `.meta.json`。
 
 如需主动运行网络 smoke test：
@@ -200,6 +218,16 @@ git diff -- tests/fixtures tests/golden
 - 阶段一：含单图普通短推文 → Syndication → Document → Markdown。
 - 阶段二：镜像补齐、Playwright Article、cookies、thread。
 - 阶段三：媒体完整化、HTML/PDF、长文样本和原规格 6 条最终验收标准。
+
+## 12. 网络连通性探针
+
+探针只测量直连状态，不使用环境代理、不修改 x2doc 抓取链：
+
+```bash
+.venv/bin/python scripts/probe_network.py --timeout 5
+```
+
+输出包含 `cdn.syndication.twimg.com`、`api.fxtwitter.com`、`api.vxtwitter.com`、`pbs.twimg.com`、`x.com` 的 DNS/TCP/TLS/HTTP/耗时，以及 Playwright Chromium 对 `https://x.com/robots.txt` 的单独结果。
 
 设计规格与阶段一实施计划：
 

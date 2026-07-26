@@ -50,3 +50,23 @@ def test_renderer_preserves_structured_blocks_and_linkifies_expanded_url(load_js
     assert "- 操作 A\n- 操作 B" in markdown
     assert '```json\n  {\n    "ok": true\n  }\n```' in markdown
     assert "[https://example.com/long/article](https://example.com/long/article)" in markdown
+
+
+def test_chinese_long_text_markdown_matches_golden(load_json: Any) -> None:
+    raw = load_json("syndication/chinese_long_text.json")
+    document = parse_syndication_tweet(
+        raw,
+        source_url="https://x.com/zh_author/status/2000000000000000001",
+        fetched_at=datetime(2026, 7, 27, 0, 30, tzinfo=UTC),
+    )
+
+    actual = render_markdown(document)
+    expected = (Path(__file__).parent / "golden" / "chinese_long_text.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert actual == expected
+    assert "https://t.co/" not in actual
+    assert "metrics:" not in actual
+    assert "tags: [\"ClaudeCode\"]" in actual
+    assert "  \n> 抓取时间" not in actual

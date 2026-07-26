@@ -10,6 +10,15 @@
 
 ---
 
+## Execution status (2026-07-27)
+
+- A/B verification: `63 passed, 1 deselected`; `ruff check .` exits 0.
+- Chinese review artifact is byte-identical to `tests/golden/chinese_long_text.md`.
+- Local HTTP stub CLI test verifies real asset writes, hash deduplication, relative Markdown references, and remote fallback warnings.
+- Direct network probe executed once per requested host with a 5-second stage timeout; raw output is retained at `/tmp/x2doc-network-probe.txt`.
+- Playwright recorded a missing Chromium executable and therefore did not reach the robots.txt HTTP stage. No browser installation, proxy, retry, or fetch-chain change was performed.
+- Article and thread work remains stopped.
+
 ### Task 1: Freeze the Chinese long-text fixture and Markdown contract
 
 **Files:**

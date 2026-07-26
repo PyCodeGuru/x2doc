@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+from x2doc.cache import SCHEMA_VERSION
 from x2doc.models import (
     Block,
     CodeBlock,
@@ -38,7 +39,7 @@ def render_markdown(document: Document, *, front_matter: bool = True) -> str:
 
     sections.append(
         "---\n\n"
-        f"> 原文链接：[查看原文]({document.source_url})  \n"
+        f"> 原文链接：[查看原文]({document.source_url})\n"
         f"> 抓取时间：{document.fetched_at.isoformat()}"
     )
     return "\n\n".join(sections).rstrip() + "\n"
@@ -48,12 +49,15 @@ def _front_matter(document: Document) -> str:
     tags = _extract_tags(document)
     lines = [
         "---",
+        f"schema_version: {SCHEMA_VERSION}",
         f"title: {_yaml_string(document.title)}",
         f"author: {_yaml_string(document.author.display_name)}",
         f"handle: {_yaml_string(document.author.handle)}",
         f"source_url: {_yaml_string(document.source_url)}",
         f"published_at: {_yaml_string(document.published_at.isoformat())}",
+        f"published_at_utc: {_yaml_string(document.published_at_utc.isoformat())}",
         f"fetched_at: {_yaml_string(document.fetched_at.isoformat())}",
+        f"fetch_path: {_yaml_string(document.fetch_path)}",
         f"lang: {_yaml_string(document.lang)}",
         f"images_count: {len(document.media)}",
         f"thread_count: {len(document.thread)}",

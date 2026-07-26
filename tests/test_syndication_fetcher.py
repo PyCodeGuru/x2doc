@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -31,7 +32,19 @@ def test_fetcher_builds_request_and_returns_contract(httpx_mock, load_json) -> N
     assert result.fetch_path == "syndication"
     assert result.raw_kind == "syndication_tweet"
     assert result.raw == raw
-    assert result.fetched_at.tzinfo == UTC
+    assert result.fetched_at.tzinfo == ZoneInfo("Asia/Shanghai")
+
+
+def test_fetcher_uses_injected_real_time_clock_in_shanghai(httpx_mock, load_json) -> None:
+    httpx_mock.add_response(json=load_json("syndication/single_image.json"))
+    fixed = datetime.fromisoformat("2026-07-27T00:15:00+00:00")
+
+    result = SyndicationFetcher(clock=lambda: fixed).fetch(
+        resolve_route("https://x.com/apimctestface/status/1253775785153884161"),
+        "zh",
+    )
+
+    assert result.fetched_at.isoformat() == "2026-07-27T08:15:00+08:00"
 
 
 @pytest.mark.parametrize("status_code", [403, 404])

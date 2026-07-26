@@ -70,4 +70,4 @@ def test_golden_update_requires_overwrite(tmp_path: Path, load_json) -> None:
         update_golden(fixture, metadata, golden, overwrite=False)
 
     update_golden(fixture, metadata, golden, overwrite=True)
-    assert golden.read_text(encoding="utf-8").startswith("---\ntitle:")
+    assert golden.read_text(encoding="utf-8").startswith("---\nschema_version: 1\ntitle:")
