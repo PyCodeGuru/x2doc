@@ -8,6 +8,10 @@
   "origin_commit_date": "2024-12-15T18:47:37Z",
   "origin_sha256": "6e751468a3561050988bc6e3bf6b91ad51cefeb12a3b57ac84c611455a094ef9",
   "captured_at": "2026-07-26T23:55:46+08:00",
+  "golden_fetched_at": "2026-07-26T12:30:00Z",
+  "golden_media_paths": [
+    "assets/001-deadbeef.jpg"
+  ],
   "direct_capture_status": "blocked_by_current_network",
   "direct_capture_evidence": [
     "Terminal DNS resolved cdn.syndication.twimg.com, then IPv4 and IPv6 TCP connections timed out after 20 seconds.",
