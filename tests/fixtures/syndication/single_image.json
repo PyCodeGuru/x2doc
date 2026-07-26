@@ -1,0 +1,53 @@
+{
+  "lang": "en",
+  "favorite_count": 5,
+  "created_at": "2020-04-24T20:00:15.000Z",
+  "entities": {
+    "hashtags": [],
+    "urls": [],
+    "user_mentions": [],
+    "symbols": [],
+    "media": [
+      {
+        "display_url": "pic.twitter.com/tluGGnRtq2",
+        "expanded_url": "https://twitter.com/apimctestface/status/1253775785153884161/photo/1",
+        "indices": [
+          29,
+          52
+        ],
+        "url": "https://t.co/tluGGnRtq2"
+      }
+    ]
+  },
+  "id_str": "1253775785153884161",
+  "text": "Testing something. Please RT https://t.co/tluGGnRtq2",
+  "user": {
+    "id_str": "756201191646691328",
+    "name": "API McTestface",
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/756348317458509825/DTKcRCpS_normal.jpg",
+    "screen_name": "apimctestface",
+    "verified": false,
+    "is_blue_verified": false
+  },
+  "mediaDetails": [
+    {
+      "display_url": "pic.twitter.com/tluGGnRtq2",
+      "expanded_url": "https://twitter.com/apimctestface/status/1253775785153884161/photo/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [
+        29,
+        52
+      ],
+      "media_url_https": "https://pbs.twimg.com/media/Dc263l9VwAAAeEH.jpg",
+      "original_info": {
+        "height": 836,
+        "width": 1600
+      },
+      "type": "photo",
+      "url": "https://t.co/tluGGnRtq2"
+    }
+  ],
+  "conversation_count": 4
+}

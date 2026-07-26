@@ -1,0 +1,17 @@
+{
+  "source_url": "https://x.com/apimctestface/status/1253775785153884161",
+  "syndication_url": "https://cdn.syndication.twimg.com/tweet-result?id=1253775785153884161&lang=zh&token=x2doc",
+  "fixture_origin": "public_repository_snapshot",
+  "origin_repository": "ianmuchina/blog",
+  "origin_path": "resources/filecache/getjson/ca3ca43b58a55e71a6cb25d46bc28ebf",
+  "origin_commit": "695f0447253f51b83dd5dccc6514c6c01e12cc96",
+  "origin_commit_date": "2024-12-15T18:47:37Z",
+  "origin_sha256": "6e751468a3561050988bc6e3bf6b91ad51cefeb12a3b57ac84c611455a094ef9",
+  "captured_at": "2026-07-26T23:55:46+08:00",
+  "direct_capture_status": "blocked_by_current_network",
+  "direct_capture_evidence": [
+    "Terminal DNS resolved cdn.syndication.twimg.com, then IPv4 and IPv6 TCP connections timed out after 20 seconds.",
+    "In-app browser returned ERR_BLOCKED_BY_CLIENT for the same public endpoint."
+  ],
+  "sanitization": "Allow-listed parser contract fields only; cookies, headers, tokens, edit metadata, and unstable presentation fields removed."
+}
