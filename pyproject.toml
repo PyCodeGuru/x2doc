@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "x2doc contributors" }]
 dependencies = [
-  "httpx>=0.28,<1",
+  "httpx[socks]>=0.28,<1",
   "markdown-it-py[linkify,plugins]>=4,<5",
   "playwright>=1.52,<2",
   "pydantic>=2.11,<3",

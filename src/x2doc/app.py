@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import Literal, Protocol
 
 from slugify import slugify
 
@@ -25,6 +25,7 @@ from x2doc.fetchers.base import FetchResult
 from x2doc.fetchers.syndication import SyndicationFetcher
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
+from x2doc.network import resolve_proxy
 from x2doc.parsers.tweet_json import parse_syndication_tweet
 from x2doc.renderers.markdown import render_markdown
 from x2doc.routing import Route, resolve_route
@@ -52,6 +53,7 @@ def convert(
     front_matter: bool = True,
     thread: ThreadMode = "auto",
     cookies: str | Path | None = None,
+    proxy: str | None = None,
     cache_dir: str | Path | None = None,
     clock: Clock | None = None,
     _fetcher: Fetcher | None = None,
@@ -80,7 +82,8 @@ def convert(
         )
 
     if document is None:
-        fetcher = _fetcher or SyndicationFetcher()
+        proxy_config = resolve_proxy(proxy)
+        fetcher = _fetcher or SyndicationFetcher(proxy=proxy_config)
         fetched = fetcher.fetch(route, lang)
         fetched_at = clock() if clock is not None else fetched.fetched_at
         document = parse_syndication_tweet(
@@ -106,8 +109,17 @@ def convert(
         raise ParameterError(f"输出目录已存在，请使用 --overwrite: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    localizer = _media_localizer or cast(MediaLocalizer, localize_media)
-    localized, warnings = localizer(document, output_dir, images)
+    if _media_localizer is not None:
+        localized, warnings = _media_localizer(document, output_dir, images)
+    else:
+        # Resolve here as well on cache hits so media downloads honor proxy
+        # precedence even when no content fetcher is constructed.
+        localized, warnings = localize_media(
+            document,
+            output_dir,
+            images,
+            proxy=resolve_proxy(proxy),
+        )
     if thread != "off" and cookies is None:
         warnings.append("当前仅获取到单条推文；如需补全 thread，请提供 --cookies PATH。")
 

@@ -13,7 +13,8 @@ import httpx
 from tenacity import Retrying, retry_if_exception_type, stop_after_attempt
 
 from x2doc.errors import InaccessibleError, NetworkError, RenderError
-from x2doc.fetchers.base import HTTP_TIMEOUT_SECONDS, USER_AGENT, FetchResult
+from x2doc.fetchers.base import FetchResult
+from x2doc.network import ProxyConfig, build_http_client, resolve_proxy
 from x2doc.routing import Route
 
 _ENDPOINT = "https://cdn.syndication.twimg.com/tweet-result"
@@ -34,21 +35,19 @@ class SyndicationFetcher:
         self,
         *,
         client: httpx.Client | None = None,
+        proxy: ProxyConfig | str | None = None,
         wait: bool = True,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._client = client
+        self._proxy = proxy if isinstance(proxy, ProxyConfig) else resolve_proxy(proxy)
         self._wait = wait
         self._clock = clock or _utc_now
 
     def fetch(self, route: Route, lang: str) -> FetchResult:
         if route.kind != "tweet":
             raise RenderError("Syndication 仅支持普通推文链接")
-        client = self._client or httpx.Client(
-            timeout=HTTP_TIMEOUT_SECONDS,
-            headers={"User-Agent": USER_AGENT},
-            follow_redirects=True,
-        )
+        client = self._client or build_http_client(proxy=self._proxy)
         try:
             retrying = Retrying(
                 stop=stop_after_attempt(3),

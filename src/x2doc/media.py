@@ -18,8 +18,8 @@ from urllib.parse import urlsplit
 import httpx
 
 from x2doc.errors import ParameterError
-from x2doc.fetchers.base import HTTP_TIMEOUT_SECONDS, USER_AGENT
 from x2doc.models import Document, Media
+from x2doc.network import ProxyConfig, build_async_http_client, resolve_proxy
 
 ImageMode = Literal["local", "embed", "none"]
 _MAX_CONCURRENCY = 5
@@ -44,6 +44,8 @@ def localize_media(
     document: Document,
     output_dir: Path,
     mode: ImageMode,
+    *,
+    proxy: ProxyConfig | str | None = None,
 ) -> tuple[Document, list[str]]:
     """Download/embed media while keeping the public API synchronous."""
 
@@ -53,7 +55,8 @@ def localize_media(
     if mode == "none" or not localized.media:
         return localized, []
 
-    downloads = _run_coroutine(lambda: _download_all(localized.media))
+    proxy_config = proxy if isinstance(proxy, ProxyConfig) else resolve_proxy(proxy)
+    downloads = _run_coroutine(lambda: _download_all(localized.media, proxy=proxy_config))
     media_by_id = {item.id: item for item in localized.media}
     warnings: list[str] = []
     digest_paths: dict[str, str] = {}
@@ -87,13 +90,13 @@ def localize_media(
     return localized, warnings
 
 
-async def _download_all(media: list[Media]) -> list[_Download]:
+async def _download_all(
+    media: list[Media],
+    *,
+    proxy: ProxyConfig | None,
+) -> list[_Download]:
     semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)
-    async with httpx.AsyncClient(
-        timeout=HTTP_TIMEOUT_SECONDS,
-        headers={"User-Agent": USER_AGENT},
-        follow_redirects=True,
-    ) as client:
+    async with build_async_http_client(proxy=proxy) as client:
 
         async def download(item: Media) -> _Download:
             async with semaphore:

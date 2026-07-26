@@ -67,6 +67,10 @@ def main(
         typer.Option("--front-matter/--no-front-matter", help="输出 YAML front matter"),
     ] = True,
     cookies: Annotated[Path | None, typer.Option("--cookies", help="Cookie 文件")] = None,
+    proxy: Annotated[
+        str | None,
+        typer.Option("--proxy", help="HTTP/HTTPS/SOCKS5 代理地址"),
+    ] = None,
     lang: Annotated[str, typer.Option("--lang", help="zh / en")] = "zh",
     overwrite: Annotated[bool, typer.Option("--overwrite", help="覆盖已知输出文件")] = False,
     refresh: Annotated[bool, typer.Option("--refresh", help="忽略缓存并重新抓取")] = False,
@@ -98,6 +102,7 @@ def main(
             front_matter=front_matter,
             thread=thread_mode,
             cookies=cookies,
+            proxy=proxy,
         )
     except X2DocError as exc:
         if verbose:

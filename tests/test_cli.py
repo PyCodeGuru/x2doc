@@ -40,6 +40,29 @@ def test_cli_success_prints_output_fetch_path_and_warning(tmp_path: Path, monkey
     assert "--cookies" in result.stdout
 
 
+def test_cli_forwards_proxy_to_converter(tmp_path: Path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_convert(*_args, **kwargs):
+        captured.update(kwargs)
+        return ConversionResult(
+            output_dir=tmp_path,
+            outputs={},
+            warnings=[],
+            fetch_path="syndication",
+            cache_path=tmp_path / "cache.json",
+        )
+
+    monkeypatch.setattr("x2doc.cli.convert", fake_convert)
+    result = runner.invoke(
+        app,
+        ["https://x.com/user/status/1", "--proxy", "http://127.0.0.1:7892"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["proxy"] == "http://127.0.0.1:7892"
+
+
 @pytest.mark.parametrize(
     ("error", "exit_code"),
     [

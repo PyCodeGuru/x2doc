@@ -58,6 +58,7 @@ x2doc 'https://x.com/apimctestface/status/1253775785153884161' \
 --overwrite                    允许覆盖本次生成的已知文件
 --lang zh|en                   默认 zh
 --verbose                      显示诊断上下文
+--proxy URL                    HTTP/HTTPS/SOCKS5 代理
 ```
 
 `--images none` 与包含 PDF 的格式始终互斥，并在联网前以退出码 1 拒绝。阶段一传入 PDF 会以退出码 4 明确提示该依赖链尚未交付。
@@ -219,15 +220,56 @@ Golden 的 `fetched_at` 来自 `.meta.json` 的 `golden_fetched_at`；真实转�
 - 阶段二：镜像补齐、Playwright Article、cookies、thread。
 - 阶段三：媒体完整化、HTML/PDF、长文样本和原规格 6 条最终验收标准。
 
-## 12. 网络连通性探针
+## 12. 受限网络下配置代理
 
-探针只测量直连状态，不使用环境代理、不修改 x2doc 抓取链：
+`x2doc` 把代理作为全局网络配置，Syndication、后续镜像 fetcher、Playwright 和图片下载共用同一选择结果。优先级固定为：
 
-```bash
-.venv/bin/python scripts/probe_network.py --timeout 5
+```text
+--proxy > X2DOC_PROXY > HTTPS_PROXY > ALL_PROXY > 直连
 ```
 
-输出包含 `cdn.syndication.twimg.com`、`api.fxtwitter.com`、`api.vxtwitter.com`、`pbs.twimg.com`、`x.com` 的 DNS/TCP/TLS/HTTP/耗时，以及 Playwright Chromium 对 `https://x.com/robots.txt` 的单独结果。
+支持 `http://`、`https://`、`socks5://`，也支持带认证信息的 `user:pass@host:port`。命令行示例：
+
+```bash
+x2doc 'https://x.com/apimctestface/status/1253775785153884161' \
+  --proxy 'http://127.0.0.1:7892' \
+  --format md \
+  --images local
+```
+
+长期使用建议设置工具专属变量，避免影响同一终端中的其它程序：
+
+```bash
+export X2DOC_PROXY='socks5://127.0.0.1:7892'
+x2doc 'https://x.com/apimctestface/status/1253775785153884161'
+```
+
+认证代理示例（密码中的 `@`、`:` 等特殊字符需进行 URL 百分号编码）：
+
+```bash
+x2doc 'https://x.com/user/status/1' \
+  --proxy 'http://user:p%40ss@proxy.example.com:8080'
+```
+
+日志只显示脱敏后的 `scheme://host:port`，不会打印用户名和密码。不要把含凭据的命令写入共享 Shell 历史、脚本或仓库；更推荐把它放入权限受控的环境配置中。
+
+常见问题：
+
+- 本地加速器的“mixed”端口通常同时接受 HTTP 与 SOCKS5，但应以客户端配置为准。
+- `127.0.0.1` 只对当前机器有效；容器或远程主机不能直接复用宿主机环回地址。
+- 设置了系统代理不等于 Playwright 自动继承。x2doc 会解析上述优先级，并在浏览器启动时显式传入代理。
+
+## 13. 网络连通性探针
+
+探针把直连和指定代理并列测量，不修改 x2doc 抓取降级链，也不会重试掩盖失败：
+
+```bash
+.venv/bin/python scripts/probe_network.py \
+  --proxy 'http://127.0.0.1:7892' \
+  --timeout 8
+```
+
+输出使用真实资源路径，记录 DNS、TCP、TLS、HTTP 状态、响应字节、JSON 顶层键和耗时。最后还会让已安装的 Playwright Chromium 分别直连、显式走代理访问 `https://x.com/robots.txt`。
 
 设计规格与阶段一实施计划：
 
