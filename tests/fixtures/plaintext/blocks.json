@@ -1,0 +1,98 @@
+[
+  {
+    "name": "paragraphs_and_zero_width_cleanup",
+    "input": "第一行\u200b\n第二行\n\n第三段",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "第一行\n第二行"
+      },
+      {
+        "type": "paragraph",
+        "text": "第三段"
+      }
+    ]
+  },
+  {
+    "name": "standalone_bold_heading",
+    "input": "**独行标题**\n正文",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 2,
+        "text": "独行标题"
+      },
+      {
+        "type": "paragraph",
+        "text": "正文"
+      }
+    ]
+  },
+  {
+    "name": "bullet_markers_form_one_list",
+    "input": "• 第一项\n- 第二项\n* 第三项",
+    "blocks": [
+      {
+        "type": "bullet_list",
+        "items": [
+          "第一项",
+          "第二项",
+          "第三项"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "numbered_lines_form_ordered_list",
+    "input": "1. 第一步\n2. 第二步\n10. 第十步",
+    "blocks": [
+      {
+        "type": "ordered_list",
+        "items": [
+          "第一步",
+          "第二步",
+          "第十步"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fenced_code_preserves_indent",
+    "input": "```json\n  {\"ok\": true}\n    nested\n```",
+    "blocks": [
+      {
+        "type": "code",
+        "language": "json",
+        "text": "  {\"ok\": true}\n    nested"
+      }
+    ]
+  },
+  {
+    "name": "divider_has_priority",
+    "input": "前文\n\n---\n\n后文",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "前文"
+      },
+      {
+        "type": "divider"
+      },
+      {
+        "type": "paragraph",
+        "text": "后文"
+      }
+    ]
+  },
+  {
+    "name": "unclosed_fence_runs_to_eof",
+    "input": "~~~python\nif True:\n    print(\"ok\")",
+    "blocks": [
+      {
+        "type": "code",
+        "language": "python",
+        "text": "if True:\n    print(\"ok\")"
+      }
+    ]
+  }
+]
