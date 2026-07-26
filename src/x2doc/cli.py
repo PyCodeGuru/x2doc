@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import traceback
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
+from typer._click.exceptions import UsageError
+from typer.core import TyperCommand
 
 from x2doc.app import convert
 from x2doc.errors import ParameterError, X2DocError
@@ -20,7 +23,34 @@ app = typer.Typer(
 _DEFAULT_OUTPUT = Path("output")
 
 
-@app.command()
+class ParameterExitCommand(TyperCommand):
+    """Map Click usage errors to x2doc's stable parameter exit code 1."""
+
+    def main(
+        self,
+        args: Sequence[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: Any,
+    ) -> Any:
+        original_exit_code = UsageError.exit_code
+        UsageError.exit_code = 1
+        try:
+            return super().main(
+                args=args,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+        finally:
+            UsageError.exit_code = original_exit_code
+
+
+@app.command(cls=ParameterExitCommand)
 def main(
     url: Annotated[str, typer.Argument(help="X/Twitter 推文或 Article 链接")],
     format_: Annotated[str, typer.Option("--format", help="md / pdf / md,pdf / all")] = "md",

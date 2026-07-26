@@ -77,3 +77,10 @@ def test_cli_rejects_images_none_with_pdf_before_converter(monkeypatch) -> None:
     assert result.exit_code == 1
     assert "互斥" in result.stdout
     assert called is False
+
+
+@pytest.mark.parametrize("args", [[], ["--unknown-option"]])
+def test_click_usage_errors_use_parameter_exit_code_one(args: list[str]) -> None:
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 1
