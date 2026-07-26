@@ -35,6 +35,7 @@ from x2doc.parsers.tweet_json import parse_syndication_tweet
 from x2doc.renderers.markdown import render_markdown
 from x2doc.renderers.pdf import render_pdf
 from x2doc.routing import Route, resolve_route
+from x2doc.thread import complete_thread
 
 ThreadMode = Literal["auto", "on", "off"]
 DEFAULT_FETCH_ORDER = ("cache", "syndication", "fxtwitter", "vxtwitter", "playwright")
@@ -140,6 +141,14 @@ def convert(
         raise ParameterError(f"输出目录已存在，请使用 --overwrite: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    thread_warnings: list[str] = []
+    if thread != "off" and cookies is not None and route.kind == "tweet":
+        document, thread_warnings = complete_thread(
+            document,
+            cookies=cookies,
+            proxy=resolve_proxy(proxy),
+        )
+
     if _media_localizer is not None:
         localized, warnings = _media_localizer(document, output_dir, images)
     else:
@@ -151,10 +160,9 @@ def convert(
             images,
             proxy=resolve_proxy(proxy),
         )
+    warnings.extend(thread_warnings)
     if thread != "off" and cookies is None:
         warnings.append("当前仅获取到单条推文；如需补全 thread，请提供 --cookies PATH。")
-    elif thread != "off" and cookies is not None and not localized.thread:
-        warnings.append("未能从当前 conversation 补全 thread；请确认 cookies 有效且具备访问权限。")
 
     outputs: dict[str, Path] = {}
     if "md" in requested_formats:

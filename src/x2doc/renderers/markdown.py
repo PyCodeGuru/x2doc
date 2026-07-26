@@ -39,6 +39,15 @@ def render_markdown(document: Document, *, front_matter: bool = True) -> str:
         if rendered:
             sections.append(rendered)
 
+    for index, reply in enumerate(document.thread, start=1):
+        reply_sections = [f"<!-- x2doc:thread:{index} -->"]
+        for block in reply.blocks:
+            rendered = _render_block(block, reply, 0)
+            if rendered:
+                reply_sections.append(rendered)
+        reply_sections.append(f"> Thread 来源：[{reply.source_id}]({reply.source_url})")
+        sections.append("\n\n".join(reply_sections))
+
     sections.append(
         "<!-- x2doc:source -->\n\n"
         f"> 原文链接：[查看原文]({document.source_url})\n"
