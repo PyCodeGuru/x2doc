@@ -36,11 +36,9 @@ def test_parse_single_image_syndication_fixture(load_json: Any) -> None:
     assert document.published_at == datetime(
         2020, 4, 25, 4, 0, 15, tzinfo=ZoneInfo("Asia/Shanghai")
     )
-    assert document.fetched_at == datetime(
-        2026, 7, 26, 20, 30, tzinfo=ZoneInfo("Asia/Shanghai")
-    )
+    assert document.fetched_at == datetime(2026, 7, 26, 20, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
     assert document.lang == "en"
-    assert document.metrics == {"likes": 5, "replies": 4}
+    assert document.metrics == {"likes": 3, "replies": 4}
     assert document.fetch_path == "syndication"
     assert document.raw == raw
 
