@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from x2doc.errors import ParameterError
 from x2doc.platforms.base import CanonicalTarget, PlatformAdapter
+from x2doc.platforms.wechat import ADAPTER as WECHAT_ADAPTER
 from x2doc.platforms.x import ADAPTER as X_ADAPTER
 
-_REGISTRY: list[PlatformAdapter] = [X_ADAPTER]
+_REGISTRY: list[PlatformAdapter] = [X_ADAPTER, WECHAT_ADAPTER]
 
 
 def register(adapter: PlatformAdapter) -> None:

@@ -7,6 +7,7 @@ import re
 from urllib.parse import urlsplit
 
 from x2doc.models import (
+    AudioBlock,
     Block,
     CodeBlock,
     DividerBlock,
@@ -17,6 +18,7 @@ from x2doc.models import (
     ParagraphBlock,
     QuoteBlock,
     TableBlock,
+    VideoBlock,
 )
 
 _BARE_URL = re.compile(r"(?<!\]\()(https?://[^\s<>]+)")
@@ -73,8 +75,10 @@ def _front_matter(document: Document) -> str:
         f"images_count: {len(document.media)}",
         f"thread_count: {len(document.thread)}",
         "tags: " + (json.dumps(tags, ensure_ascii=False) if tags else "[]"),
-        "---",
     ]
+    if document.original_link:
+        lines.append(f"original_link: {_yaml_string(document.original_link)}")
+    lines.append("---")
     return "\n".join(lines)
 
 
@@ -108,6 +112,10 @@ def _render_block(block: Block, document: Document, image_number: int) -> str:
         reference = media.local_path or media.data_uri or media.original_url
         caption = block.caption or media.alt_text or f"图 {image_number}"
         return f"![{caption}]({reference})"
+    if isinstance(block, AudioBlock):
+        return f"> 音频：{f'[{block.text}]({block.url})' if block.url else block.text}"
+    if isinstance(block, VideoBlock):
+        return f"> 视频：{f'[{block.text}]({block.url})' if block.url else block.text}"
     return ""
 
 

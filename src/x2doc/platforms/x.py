@@ -28,15 +28,24 @@ class XPlatform:
         if article:
             source_id = article.group(1)
             return CanonicalTarget(
-                Platform.X, "article", source_id, f"https://x.com/i/article/{source_id}",
-                ("playwright",), raw_input_url=url,
+                Platform.X,
+                "article",
+                source_id,
+                f"https://x.com/i/article/{source_id}",
+                ("playwright",),
+                raw_input_url=url,
             )
         tweet = _TWEET.fullmatch(parts.path)
         if tweet:
             handle, source_id = tweet.groups()
             return CanonicalTarget(
-                Platform.X, "tweet", source_id, f"https://x.com/{handle}/status/{source_id}",
-                ("syndication", "fxtwitter", "vxtwitter", "playwright"), handle, url,
+                Platform.X,
+                "tweet",
+                source_id,
+                f"https://x.com/{handle}/status/{source_id}",
+                ("syndication", "fxtwitter", "vxtwitter", "playwright"),
+                handle,
+                url,
             )
         raise ParameterError("无法识别该 X 链接：仅支持推文 status 和 Article 地址")
 

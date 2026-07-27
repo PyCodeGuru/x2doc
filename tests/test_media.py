@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 
-from x2doc.media import localize_media
+from x2doc.media import _choose_extension, _media_headers, localize_media
 from x2doc.models import Author, Document, ImageBlock, Media
 
 
@@ -126,3 +126,9 @@ def test_existing_assets_are_reused_without_network(tmp_path: Path, httpx_mock) 
     assert document.media[0].local_path == "assets/001-deadbeef.jpg"
     assert warnings == []
     assert httpx_mock.get_requests() == []
+# WeChat image URLs require a stable Referer and declare format in wx_fmt.
+def test_wechat_media_headers_and_extension_policy() -> None:
+    url = "https://mmbiz.qpic.cn/mmbiz/image?wx_fmt=png"
+
+    assert _media_headers(url) == {"Referer": "https://mp.weixin.qq.com/"}
+    assert _choose_extension("image/jpeg", url) == ".png"

@@ -16,6 +16,7 @@ from x2doc.models import Document, Platform, StrictModel
 from x2doc.parsers.article_dom import parse_article_dom
 from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
 from x2doc.parsers.tweet_json import parse_syndication_tweet
+from x2doc.parsers.wechat_dom import parse_wechat_dom
 from x2doc.routing import Route
 
 SCHEMA_VERSION = 2
@@ -25,6 +26,8 @@ RAW_PARSERS: dict[str, RawParser] = {
     "fxtwitter_json": parse_fxtwitter_tweet,
     "vxtwitter_json": parse_vxtwitter_tweet,
     "playwright_article_dom": parse_article_dom,
+    "wechat_html": parse_wechat_dom,
+    "wechat_dom": parse_wechat_dom,
 }
 
 

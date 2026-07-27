@@ -83,6 +83,19 @@ class TableBlock(StrictModel):
     rows: list[list[str]]
 
 
+class AudioBlock(StrictModel):
+    type: Literal["audio"] = "audio"
+    url: str | None = None
+    text: str = "音频"
+
+
+class VideoBlock(StrictModel):
+    type: Literal["video"] = "video"
+    url: str | None = None
+    poster_media_id: str | None = None
+    text: str = "视频"
+
+
 Block = Annotated[
     ParagraphBlock
     | HeadingBlock
@@ -91,7 +104,9 @@ Block = Annotated[
     | CodeBlock
     | ImageBlock
     | DividerBlock
-    | TableBlock,
+    | TableBlock
+    | AudioBlock
+    | VideoBlock,
     Field(discriminator="type"),
 ]
 

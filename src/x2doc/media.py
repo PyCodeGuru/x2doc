@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypeVar
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
@@ -28,6 +28,7 @@ _EXTENSIONS = {
     "image/png": ".png",
     "image/webp": ".webp",
     "image/gif": ".gif",
+    "image/svg+xml": ".svg",
 }
 T = TypeVar("T")
 
@@ -109,7 +110,9 @@ async def _download_all(
         async def download(item: Media) -> _Download:
             async with semaphore:
                 try:
-                    response = await client.get(item.original_url)
+                    response = await client.get(
+                        item.original_url, headers=_media_headers(item.original_url)
+                    )
                     response.raise_for_status()
                 except httpx.HTTPError as exc:
                     return _Download(media_id=item.id, error=str(exc))
@@ -150,12 +153,22 @@ def _run_coroutine(factory: Callable[[], Awaitable[T]]) -> T:
 
 
 def _choose_extension(content_type: str, url: str) -> str:
+    requested = parse_qs(urlsplit(url).query).get("wx_fmt", [""])[0].lower()
+    if requested in {"jpeg", "jpg", "png", "gif", "svg", "webp"}:
+        return ".jpg" if requested in {"jpeg", "jpg"} else f".{requested}"
     if content_type in _EXTENSIONS:
         return _EXTENSIONS[content_type]
     suffix = Path(urlsplit(url).path).suffix.lower()
     if suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
         return ".jpg" if suffix == ".jpeg" else suffix
     return ".bin"
+
+
+def _media_headers(url: str) -> dict[str, str]:
+    host = (urlsplit(url).hostname or "").lower()
+    if host == "mmbiz.qpic.cn" or host.endswith(".mmbiz.qpic.cn"):
+        return {"Referer": "https://mp.weixin.qq.com/"}
+    return {}
 
 
 def _atomic_write(path: Path, content: bytes) -> None:
