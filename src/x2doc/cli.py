@@ -3,55 +3,62 @@
 from __future__ import annotations
 
 import traceback
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 from typer._click.exceptions import UsageError
-from typer.core import TyperCommand
+from typer.core import TyperCommand, TyperGroup
 
 from x2doc.app import convert
 from x2doc.cookies import load_cookies
+from x2doc.doctor import render_report, run_doctor
 from x2doc.errors import ParameterError, X2DocError
 
+_DEFAULT_OUTPUT = Path("output")
+
+
+class ParameterExitMixin:
+    """Map every Click/Typer usage error to x2doc's parameter code 1."""
+
+    def main(self, *args: Any, **kwargs: Any) -> Any:
+        original_exit_code = UsageError.exit_code
+        UsageError.exit_code = 1
+        try:
+            return super().main(*args, **kwargs)  # type: ignore[misc]
+        finally:
+            UsageError.exit_code = original_exit_code
+
+
+class DefaultCommandGroup(ParameterExitMixin, TyperGroup):
+    """Keep ``x2doc URL`` while also exposing explicit subcommands."""
+
+    def parse_args(self, ctx: Any, args: list[str]) -> list[str]:
+        forwarded = list(args)
+        if not forwarded or (
+            not forwarded[0].startswith("-")
+            and forwarded[0] not in {"convert", "doctor"}
+        ):
+            forwarded.insert(0, "convert")
+        return super().parse_args(ctx, forwarded)
+
+
 app = typer.Typer(
+    cls=DefaultCommandGroup,
     add_completion=False,
     no_args_is_help=False,
     pretty_exceptions_enable=False,
     help="将 X 链接转换为 Markdown / PDF。",
 )
-_DEFAULT_OUTPUT = Path("output")
 
 
-class ParameterExitCommand(TyperCommand):
+class ParameterExitCommand(ParameterExitMixin, TyperCommand):
     """Map Click usage errors to x2doc's stable parameter exit code 1."""
 
-    def main(
-        self,
-        args: Sequence[str] | None = None,
-        prog_name: str | None = None,
-        complete_var: str | None = None,
-        standalone_mode: bool = True,
-        windows_expand_args: bool = True,
-        **extra: Any,
-    ) -> Any:
-        original_exit_code = UsageError.exit_code
-        UsageError.exit_code = 1
-        try:
-            return super().main(
-                args=args,
-                prog_name=prog_name,
-                complete_var=complete_var,
-                standalone_mode=standalone_mode,
-                windows_expand_args=windows_expand_args,
-                **extra,
-            )
-        finally:
-            UsageError.exit_code = original_exit_code
+    pass
 
 
-@app.command(cls=ParameterExitCommand)
+@app.command("convert", cls=ParameterExitCommand, hidden=True)
 def main(
     url: Annotated[str, typer.Argument(help="X/Twitter 推文或 Article 链接")],
     format_: Annotated[str, typer.Option("--format", help="md / pdf / md,pdf / all")] = "md",
@@ -137,3 +144,18 @@ def main(
 def _exit_with(error: X2DocError) -> None:
     typer.echo(f"错误: {error}")
     raise typer.Exit(code=error.exit_code)
+
+
+@app.command("doctor")
+def doctor_command(
+    proxy: Annotated[
+        str | None,
+        typer.Option("--proxy", help="HTTP/HTTPS/SOCKS5 代理地址"),
+    ] = None,
+) -> None:
+    """检查 Python、浏览器、字体、代理、网络和目录。"""
+
+    report = run_doctor(cli_proxy=proxy)
+    typer.echo(render_report(report))
+    if not report.ok:
+        raise typer.Exit(code=report.exit_code)

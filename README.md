@@ -1,5 +1,21 @@
 # x2doc
 
+## 5 分钟上手
+
+```bash
+cd /Users/paipai_tm/Work/tools/x2doc && python3 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/python -m playwright install chromium
+```
+
+```bash
+cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc doctor --proxy 'http://127.0.0.1:7892'
+```
+
+```bash
+cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc 'https://x.com/ma_zhenyuan/status/2081364662818599028' --proxy 'http://127.0.0.1:7892' --format md,pdf --images local --overwrite
+```
+
+完整说明见 [docs/使用指南.md](docs/使用指南.md)。
+
 `x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）推文和 Article 转换为结构化 Markdown 与 A4 PDF。
 
 公开推文默认按 `cache,syndication,fxtwitter,vxtwitter,playwright` 降级；Article URL 直接进入 Playwright。抓取结果统一归一化为 `Document`，再输出 Markdown、HTML 中间表示与 PDF。

@@ -4,3 +4,9 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 output/
+.DS_Store
+cookies*.json
+cookies*.txt
+*.cookies.json
+*.cookies.txt
+.cookies/

@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from x2doc.cli import app
+from x2doc.doctor import DoctorCheck, DoctorReport
 from x2doc.errors import (
     DependencyError,
     InaccessibleError,
@@ -61,6 +62,34 @@ def test_cli_forwards_proxy_to_converter(tmp_path: Path, monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert captured["proxy"] == "http://127.0.0.1:7892"
+
+
+def test_doctor_subcommand_prints_report_and_returns_zero(monkeypatch) -> None:
+    report = DoctorReport((DoctorCheck("Python", True, "3.12", ""),))
+    captured: dict[str, object] = {}
+
+    def fake_doctor(*, cli_proxy=None, **_kwargs):
+        captured["proxy"] = cli_proxy
+        return report
+
+    monkeypatch.setattr("x2doc.cli.run_doctor", fake_doctor, raising=False)
+    result = runner.invoke(app, ["doctor", "--proxy", "http://127.0.0.1:7892"])
+
+    assert result.exit_code == 0
+    assert "✅ Python：3.12" in result.stdout
+    assert captured["proxy"] == "http://127.0.0.1:7892"
+
+
+def test_doctor_subcommand_returns_four_when_any_check_fails(monkeypatch) -> None:
+    report = DoctorReport(
+        (DoctorCheck("Chromium", False, "未安装", "python -m playwright install chromium"),)
+    )
+    monkeypatch.setattr("x2doc.cli.run_doctor", lambda **_kwargs: report, raising=False)
+
+    result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 4
+    assert "❌ Chromium：未安装" in result.stdout
 
 
 @pytest.mark.parametrize(
