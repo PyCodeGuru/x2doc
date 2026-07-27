@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import os
-import re
 import tempfile
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Protocol
-
-from slugify import slugify
 
 from x2doc.cache import (
     SCHEMA_VERSION,
@@ -23,18 +20,11 @@ from x2doc.cache import (
 )
 from x2doc.errors import DependencyError, ParameterError
 from x2doc.fetchers.base import FetchResult
-from x2doc.fetchers.mirror import MirrorFetcher
 from x2doc.fetchers.pipeline import FetchPipeline
-from x2doc.fetchers.playwright import PlaywrightArticleFetcher
-from x2doc.fetchers.syndication import SyndicationFetcher
-from x2doc.fetchers.wechat import WeChatPlaywrightFetcher, WeChatStaticFetcher
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
 from x2doc.network import NetworkPolicy, parse_no_proxy_domains, resolve_proxy
-from x2doc.parsers.article_dom import parse_article_dom
-from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
-from x2doc.parsers.tweet_json import parse_syndication_tweet
-from x2doc.parsers.wechat_dom import parse_wechat_dom
+from x2doc.platforms import adapter_for
 from x2doc.renderers.markdown import render_markdown
 from x2doc.renderers.pdf import render_pdf
 from x2doc.routing import Route, resolve_target
@@ -72,12 +62,13 @@ def convert(
     _fetcher: Fetcher | None = None,
     _media_localizer: MediaLocalizer | None = None,
 ) -> ConversionResult:
-    """Convert one supported X URL using a synchronous public API."""
+    """Convert one supported X or WeChat URL using a synchronous public API."""
 
     requested_formats = _normalize_formats(formats)
     if images == "none" and "pdf" in requested_formats:
         raise ParameterError("--images none 与 PDF 输出互斥，请改用 local 或 embed")
     route = resolve_target(url)
+    adapter = adapter_for(route.platform)
     network_policy = NetworkPolicy(
         proxy=resolve_proxy(proxy),
         no_proxy_domains=parse_no_proxy_domains(
@@ -109,28 +100,11 @@ def convert(
         else []
     )
     if document is None:
-        proxy_config = route_proxy
         if _fetcher is not None:
             fetched = _fetcher.fetch(route, lang)
         else:
             order = _normalize_fetch_order(fetch_order, route)
-            pipeline = FetchPipeline(
-                {
-                    "syndication": SyndicationFetcher(proxy=proxy_config),
-                    "fxtwitter": MirrorFetcher("fxtwitter", proxy=proxy_config),
-                    "vxtwitter": MirrorFetcher("vxtwitter", proxy=proxy_config),
-                    "playwright": PlaywrightArticleFetcher(proxy=proxy_config, cookies=cookies),
-                    "static": WeChatStaticFetcher(policy=network_policy),
-                    "wechat_playwright": WeChatPlaywrightFetcher(policy=network_policy),
-                }
-            )
-            if route.platform.value == "wechat":
-                pipeline = FetchPipeline(
-                    {
-                        "static": WeChatStaticFetcher(policy=network_policy),
-                        "playwright": WeChatPlaywrightFetcher(policy=network_policy),
-                    }
-                )
+            pipeline = FetchPipeline(adapter.build_fetchers(policy=network_policy, cookies=cookies))
             fetched, recorded = pipeline.fetch(route, lang, order)
             attempts = [
                 {
@@ -142,14 +116,7 @@ def convert(
                 for item in recorded
             ]
         fetched_at = clock() if clock is not None else fetched.fetched_at
-        parser = {
-            "syndication_tweet": parse_syndication_tweet,
-            "fxtwitter_json": parse_fxtwitter_tweet,
-            "vxtwitter_json": parse_vxtwitter_tweet,
-            "playwright_article_dom": parse_article_dom,
-            "wechat_html": parse_wechat_dom,
-            "wechat_dom": parse_wechat_dom,
-        }.get(fetched.raw_kind)
+        parser = adapter.parser_map().get(fetched.raw_kind)
         if parser is None:
             raise DependencyError(f"没有可用 parser: {fetched.raw_kind}")
         document = parser(fetched.raw, route.canonical_url, fetched_at)
@@ -236,18 +203,7 @@ def _normalize_fetch_order(value: Sequence[str] | str, route: Route) -> tuple[st
 def build_output_dir(root: Path, document: Document) -> Path:
     """Apply the fixed handle-date-Unicode-slug output naming contract."""
 
-    if document.platform.value == "wechat":
-        handle = slugify(document.author.display_name, allow_unicode=True, max_length=40)
-    else:
-        handle = re.sub(r"[^A-Za-z0-9_.-]+", "-", document.author.handle.lstrip("@"))
-        handle = handle.strip("-._")
-    handle = handle or "unknown"
-    date = document.published_at.strftime("%Y%m%d")
-    title_slug = slugify(document.title, allow_unicode=True, max_length=40)
-    if not title_slug:
-        prefix = "tweet" if document.platform.value == "x" else "article"
-        title_slug = f"{prefix}-{document.source_id}"
-    return root / document.platform.value / f"{handle}-{date}-{title_slug}"
+    return adapter_for(document.platform).output_dir(root, document)
 
 
 def _normalize_formats(formats: Sequence[str] | None) -> tuple[str, ...]:

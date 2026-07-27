@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from x2doc.errors import ParameterError
-from x2doc.models import Platform
+from x2doc.models import Document, Platform
 from x2doc.platforms.base import CanonicalTarget
 
 _HOSTS = {"mp.weixin.qq.com", "www.mp.weixin.qq.com"}
@@ -63,6 +64,32 @@ class WeChatPlatform:
             ("static", "playwright"),
             raw_input_url=url,
         )
+
+    def parser_map(self):
+        from x2doc.parsers.wechat_dom import parse_wechat_dom
+
+        return {"wechat_html": parse_wechat_dom, "wechat_dom": parse_wechat_dom}
+
+    def build_fetchers(self, *, policy, cookies):
+        del cookies
+        from x2doc.fetchers.wechat import WeChatPlaywrightFetcher, WeChatStaticFetcher
+
+        return {
+            "static": WeChatStaticFetcher(policy=policy),
+            "playwright": WeChatPlaywrightFetcher(policy=policy),
+        }
+
+    def output_dir(self, root: Path, document: Document) -> Path:
+        from slugify import slugify
+
+        account = (
+            slugify(document.author.display_name, allow_unicode=True, max_length=40) or "unknown"
+        )
+        slug = (
+            slugify(document.title, allow_unicode=True, max_length=40)
+            or f"article-{document.source_id}"
+        )
+        return root / "wechat" / f"{account}-{document.published_at:%Y%m%d}-{slug}"
 
 
 ADAPTER = WeChatPlatform()

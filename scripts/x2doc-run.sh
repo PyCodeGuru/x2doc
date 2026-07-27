@@ -46,7 +46,7 @@ fi
 echo "正在检查环境……"
 "$VENV_X2DOC" doctor || exit 4
 
-printf "请粘贴 X 链接："
+printf "请粘贴 X 或微信公众号文章链接："
 read -r x_url
 if [ -z "$x_url" ]; then
   echo "错误：没有输入链接。"

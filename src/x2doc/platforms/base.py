@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
-from x2doc.models import Platform
+from x2doc.models import Document, Platform
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,3 +34,9 @@ class PlatformAdapter(Protocol):
     def match(self, url: str) -> bool: ...
 
     def normalize(self, url: str) -> CanonicalTarget: ...
+
+    def parser_map(self) -> dict[str, Any]: ...
+
+    def build_fetchers(self, *, policy: Any, cookies: str | Path | None) -> dict[str, Any]: ...
+
+    def output_dir(self, root: Path, document: Document) -> Path: ...

@@ -3,6 +3,7 @@ schema_version: 1
 title: "代码知识库：从 0 到 1 小白完整教程"
 author: "Miles.Ma"
 handle: "ma_zhenyuan"
+platform: "x"
 source_url: "https://x.com/ma_zhenyuan/status/2081364662818599028"
 published_at: "2026-07-26T21:03:00+08:00"
 published_at_utc: "2026-07-26T13:03:00+00:00"

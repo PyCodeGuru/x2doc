@@ -86,7 +86,33 @@ def test_direct_connection_is_a_valid_proxy_mode() -> None:
     check = check_proxy("直连", None)
 
     assert check.ok is True
-    assert check.detail == "直连（未配置显式代理）"
+    assert check.detail.startswith("直连（未配置显式代理）")
+    assert "mp.weixin.qq.com" in check.detail
+
+
+def test_default_doctor_includes_wechat_source_and_image(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("x2doc.doctor.check_python", lambda: DoctorCheck("1", True, "ok", ""))
+    monkeypatch.setattr("x2doc.doctor.check_package", lambda: DoctorCheck("2", True, "ok", ""))
+    monkeypatch.setattr("x2doc.doctor.check_chromium", lambda: DoctorCheck("3", True, "ok", ""))
+    monkeypatch.setattr("x2doc.doctor.check_font", lambda: DoctorCheck("4", True, "ok", ""))
+    monkeypatch.setattr(
+        "x2doc.doctor.check_data_sources", lambda _proxy: DoctorCheck("6", True, "ok", "")
+    )
+    monkeypatch.setattr(
+        "x2doc.doctor.check_image_source", lambda _proxy: DoctorCheck("7", True, "ok", "")
+    )
+    monkeypatch.setattr(
+        "x2doc.doctor.check_wechat_source", lambda: DoctorCheck("10", True, "直连", "")
+    )
+    monkeypatch.setattr(
+        "x2doc.doctor.check_wechat_image", lambda: DoctorCheck("11", True, "Referer", "")
+    )
+
+    report = run_doctor(environ={}, cwd=tmp_path)
+
+    assert len(report.checks) == 11
+    assert report.checks[-2].name == "10"
+    assert report.checks[-1].name == "11"
 
 
 def test_format_bytes_is_deterministic() -> None:

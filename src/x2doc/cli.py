@@ -48,7 +48,7 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=False,
     pretty_exceptions_enable=False,
-    help="将 X 链接转换为 Markdown / PDF。",
+    help="将 X 或微信公众号链接转换为 Markdown / PDF。",
 )
 
 
@@ -60,7 +60,7 @@ class ParameterExitCommand(ParameterExitMixin, TyperCommand):
 
 @app.command("convert", cls=ParameterExitCommand, hidden=True)
 def main(
-    url: Annotated[str, typer.Argument(help="X/Twitter 推文或 Article 链接")],
+    url: Annotated[str, typer.Argument(help="X/Twitter 或微信公众号文章链接")],
     format_: Annotated[str, typer.Option("--format", help="md / pdf / md,pdf / all")] = "md",
     out: Annotated[Path, typer.Option("--out", help="输出根目录")] = _DEFAULT_OUTPUT,
     thread: Annotated[bool | None, typer.Option("--thread/--no-thread", help="补全 thread")] = None,

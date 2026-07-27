@@ -14,9 +14,13 @@ cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc doctor --proxy 'http://1
 cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc 'https://x.com/ma_zhenyuan/status/2081364662818599028' --proxy 'http://127.0.0.1:7892' --format md,pdf --images local --overwrite
 ```
 
+```bash
+cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc 'https://mp.weixin.qq.com/s/AwOk3di8m6eVeIUjzNftgg' --format md,pdf --images local --overwrite
+```
+
 完整说明见 [docs/使用指南.md](docs/使用指南.md)。
 
-`x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）推文和 Article 转换为结构化 Markdown 与 A4 PDF。
+`x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）和微信公众号文章转换为结构化 Markdown 与 A4 PDF。
 
 公开推文默认按 `cache,syndication,fxtwitter,vxtwitter,playwright` 降级；Article URL 直接进入 Playwright。抓取结果统一归一化为 `Document`，再输出 Markdown、HTML 中间表示与 PDF。
 
@@ -95,7 +99,7 @@ print(result.fetch_path)
 目录规则固定为：
 
 ```text
-output/{handle}-{YYYYMMDD}-{slug}/
+output/{platform}/{handle-or-account}-{YYYYMMDD}-{slug}/
 ├── index.md
 ├── index.pdf
 └── assets/

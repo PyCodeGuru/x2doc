@@ -3,6 +3,7 @@ schema_version: 1
 title: "一周 17k star，我总算知道这本书为什么涨这么猛了"
 author: "余温"
 handle: "gkxspace"
+platform: "x"
 source_url: "https://x.com/gkxspace/status/2080130089392508982"
 published_at: "2026-07-23T11:17:14+08:00"
 published_at_utc: "2026-07-23T03:17:14+00:00"

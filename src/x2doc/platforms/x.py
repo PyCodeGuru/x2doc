@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from x2doc.errors import ParameterError
-from x2doc.models import Platform
+from x2doc.models import Document, Platform
 from x2doc.platforms.base import CanonicalTarget
 
 _HOSTS = {"x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}
@@ -48,6 +49,44 @@ class XPlatform:
                 url,
             )
         raise ParameterError("无法识别该 X 链接：仅支持推文 status 和 Article 地址")
+
+    def parser_map(self):
+        from x2doc.parsers.article_dom import parse_article_dom
+        from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
+        from x2doc.parsers.tweet_json import parse_syndication_tweet
+
+        return {
+            "syndication_tweet": parse_syndication_tweet,
+            "fxtwitter_json": parse_fxtwitter_tweet,
+            "vxtwitter_json": parse_vxtwitter_tweet,
+            "playwright_article_dom": parse_article_dom,
+        }
+
+    def build_fetchers(self, *, policy, cookies):
+        from x2doc.fetchers.mirror import MirrorFetcher
+        from x2doc.fetchers.playwright import PlaywrightArticleFetcher
+        from x2doc.fetchers.syndication import SyndicationFetcher
+
+        proxy = policy.proxy
+        return {
+            "syndication": SyndicationFetcher(proxy=proxy),
+            "fxtwitter": MirrorFetcher("fxtwitter", proxy=proxy),
+            "vxtwitter": MirrorFetcher("vxtwitter", proxy=proxy),
+            "playwright": PlaywrightArticleFetcher(proxy=proxy, cookies=cookies),
+        }
+
+    def output_dir(self, root: Path, document: Document) -> Path:
+        from slugify import slugify
+
+        handle = (
+            re.sub(r"[^A-Za-z0-9_.-]+", "-", document.author.handle.lstrip("@")).strip("-._")
+            or "unknown"
+        )
+        slug = (
+            slugify(document.title, allow_unicode=True, max_length=40)
+            or f"tweet-{document.source_id}"
+        )
+        return root / "x" / f"{handle}-{document.published_at:%Y%m%d}-{slug}"
 
 
 ADAPTER = XPlatform()

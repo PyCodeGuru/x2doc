@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from x2doc.network import ProxyConfig, build_http_client, resolve_proxy
+from x2doc.network import DEFAULT_NO_PROXY_DOMAINS, ProxyConfig, build_http_client, resolve_proxy
 from x2doc.renderers.pdf import detect_chinese_font
 
 PROJECT_ROOT = Path("/Users/paipai_tm/Work/tools/x2doc")
@@ -32,6 +32,12 @@ _DATA_URLS = (
     ),
 )
 _IMAGE_URL = "https://pbs.twimg.com/media/Dc263l9VwAAAeEH.jpg"
+_WECHAT_URL = "https://mp.weixin.qq.com/s/AwOk3di8m6eVeIUjzNftgg"
+_WECHAT_IMAGE_URL = (
+    "https://mmbiz.qpic.cn/mmbiz_png/2jjfQoZLoqXbOp3bqq5A4ialiafOD6AWcL"
+    "M1Ria8uG4SBFjTaaSoa7yzlDQNLe9e8ckIEndGUO7ruPfPpfyrM2qejhohdvFdNia0x3f0e5bNYrA/640"
+    "?wx_fmt=png"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,14 +183,17 @@ def check_font(detector: Callable[[], str] = detect_chinese_font) -> DoctorCheck
 
 
 def check_proxy(source: str, proxy: ProxyConfig | None) -> DoctorCheck:
+    direct = ", ".join(sorted(DEFAULT_NO_PROXY_DOMAINS))
     if proxy is None:
         return DoctorCheck(
             "5. 代理配置",
             True,
-            "直连（未配置显式代理）",
+            f"直连（未配置显式代理）；直连域名：{direct}",
             "",
         )
-    return DoctorCheck("5. 代理配置", True, f"{source} → {proxy.redacted}", "")
+    return DoctorCheck(
+        "5. 代理配置", True, f"{source} → {proxy.redacted}；直连域名：{direct}", ""
+    )
 
 
 def check_data_sources(proxy: ProxyConfig | None) -> DoctorCheck:
@@ -209,6 +218,37 @@ def check_image_source(proxy: ProxyConfig | None) -> DoctorCheck:
         ok,
         f"{name} {'可达' if ok else '失败'} {elapsed}ms",
         f"cd {PROJECT_ROOT} && X2DOC_PROXY='http://127.0.0.1:7892' .venv/bin/x2doc doctor",
+    )
+
+
+def check_wechat_source() -> DoctorCheck:
+    name, ok, elapsed = _quick_request(
+        "mp.weixin.qq.com", _WECHAT_URL, None, trust_env=False
+    )
+    return DoctorCheck(
+        "10. 微信文章源",
+        ok,
+        f"{name} 直连{'可达' if ok else '失败'} {elapsed}ms",
+        f"cd {PROJECT_ROOT} && curl -I --max-time 5 '{_WECHAT_URL}'",
+    )
+
+
+def check_wechat_image() -> DoctorCheck:
+    name, ok, elapsed = _quick_request(
+        "mmbiz.qpic.cn",
+        _WECHAT_IMAGE_URL,
+        None,
+        headers={"Referer": "https://mp.weixin.qq.com/"},
+        trust_env=False,
+    )
+    return DoctorCheck(
+        "11. 微信图片源",
+        ok,
+        f"{name} 带 Referer 直连{'可达' if ok else '失败'} {elapsed}ms",
+        (
+            f"cd {PROJECT_ROOT} && curl -I --max-time 5 "
+            "-H 'Referer: https://mp.weixin.qq.com/' 'https://mmbiz.qpic.cn/'"
+        ),
     )
 
 
@@ -255,13 +295,24 @@ def _default_checks(
         lambda: check_image_source(proxy),
         check_cache,
         lambda: check_output(cwd / "output"),
+        check_wechat_source,
+        check_wechat_image,
     )
 
 
-def _quick_request(name: str, url: str, proxy: ProxyConfig | None) -> tuple[str, bool, int]:
+def _quick_request(
+    name: str,
+    url: str,
+    proxy: ProxyConfig | None,
+    *,
+    headers: Mapping[str, str] | None = None,
+    trust_env: bool = True,
+) -> tuple[str, bool, int]:
     started = time.monotonic()
     try:
-        with build_http_client(proxy=proxy, timeout=_TIMEOUT, trust_env=True) as client:
+        with build_http_client(
+            proxy=proxy, timeout=_TIMEOUT, headers=headers, trust_env=trust_env
+        ) as client:
             response = client.get(url)
         ok = response.status_code < 500
     except Exception:

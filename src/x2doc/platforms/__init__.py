@@ -19,6 +19,18 @@ def registered_platforms() -> tuple[PlatformAdapter, ...]:
     return tuple(_REGISTRY)
 
 
+def adapter_for(name) -> PlatformAdapter:
+    return next(adapter for adapter in _REGISTRY if adapter.name == name)
+
+
+def parser_for(raw_kind: str):
+    for adapter in _REGISTRY:
+        parser = adapter.parser_map().get(raw_kind)
+        if parser is not None:
+            return parser
+    return None
+
+
 def resolve_target(url: str) -> CanonicalTarget:
     for adapter in _REGISTRY:
         if adapter.match(url):
@@ -29,4 +41,11 @@ def resolve_target(url: str) -> CanonicalTarget:
     raise ParameterError(f"链接不属于当前支持的平台。支持 X、微信公众号。示例：{examples}")
 
 
-__all__ = ["CanonicalTarget", "register", "registered_platforms", "resolve_target"]
+__all__ = [
+    "CanonicalTarget",
+    "adapter_for",
+    "parser_for",
+    "register",
+    "registered_platforms",
+    "resolve_target",
+]
