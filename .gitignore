@@ -3,7 +3,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
-output/
 .DS_Store
 cookies*.json
 cookies*.txt
