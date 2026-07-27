@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
-from x2doc.errors import InaccessibleError, NetworkError
+from x2doc.errors import InaccessibleError, NetworkError, RenderError
 from x2doc.fetchers.syndication import SyndicationFetcher
 from x2doc.routing import resolve_route
 
@@ -45,6 +45,24 @@ def test_fetcher_uses_injected_real_time_clock_in_shanghai(httpx_mock, load_json
     )
 
     assert result.fetched_at.isoformat() == "2026-07-27T08:15:00+08:00"
+
+
+def test_fetcher_rejects_truncated_note_tweet_so_pipeline_can_fall_back(httpx_mock) -> None:
+    """A note_tweet id without note text means Syndication returned only a preview."""
+
+    httpx_mock.add_response(
+        json={
+            "id_str": "2056590419366932809",
+            "text": "几个真正牛的点：\n① https://t.co/image",
+            "note_tweet": {"id": "opaque-note-id"},
+        }
+    )
+
+    with pytest.raises(RenderError, match="长推文正文不完整"):
+        SyndicationFetcher().fetch(
+            resolve_route("https://x.com/TianjiOracle/status/2056590419366932809"),
+            "zh",
+        )
 
 
 @pytest.mark.parametrize("status_code", [403, 404])

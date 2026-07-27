@@ -57,6 +57,21 @@
     ]
   },
   {
+    "name": "circled_number_lines_form_ordered_list",
+    "input": "① 四信号知识图谱\n② Louvain 社区检测\n③ Chrome 一键剪藏\n④ 兼容 Obsidian",
+    "blocks": [
+      {
+        "type": "ordered_list",
+        "items": [
+          "四信号知识图谱",
+          "Louvain 社区检测",
+          "Chrome 一键剪藏",
+          "兼容 Obsidian"
+        ]
+      }
+    ]
+  },
+  {
     "name": "fenced_code_preserves_indent",
     "input": "```json\n  {\"ok\": true}\n    nested\n```",
     "blocks": [

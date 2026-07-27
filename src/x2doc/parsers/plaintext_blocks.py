@@ -15,7 +15,7 @@ _ZERO_WIDTH = str.maketrans("", "", "\u200b\u200c\u200d\ufeff")
 _FENCE = re.compile(r"^(```|~~~)([A-Za-z0-9_+.-]*)\s*$")
 _HEADING = re.compile(r"^\*\*(.+?)\*\*$")
 _BULLET = re.compile(r"^(?:•|-|\*)\s+(.+?)\s*$")
-_ORDERED = re.compile(r"^\d+\.\s+(.+?)\s*$")
+_ORDERED = re.compile(r"^(?:\d+\.|[①-⑳])\s+(.+?)\s*$")
 
 
 def parse_plaintext_blocks(text: str) -> list[Block]:
@@ -44,9 +44,7 @@ def parse_plaintext_blocks(text: str) -> list[Block]:
         # Code is the only state where every original character is significant.
         if code_marker is not None:
             if raw_line.strip() == code_marker:
-                blocks.append(
-                    CodeBlock(language=code_language, text="\n".join(buffer))
-                )
+                blocks.append(CodeBlock(language=code_language, text="\n".join(buffer)))
                 code_marker = None
                 code_language = None
                 buffer = []

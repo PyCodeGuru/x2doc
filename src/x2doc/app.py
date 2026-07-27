@@ -21,6 +21,7 @@ from x2doc.cache import (
 from x2doc.errors import DependencyError, ParameterError
 from x2doc.fetchers.base import FetchResult
 from x2doc.fetchers.pipeline import FetchPipeline
+from x2doc.fetchers.syndication import is_incomplete_syndication_payload
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
 from x2doc.network import NetworkPolicy, parse_no_proxy_domains, resolve_proxy
@@ -99,6 +100,23 @@ def convert(
         if document is not None
         else []
     )
+    if (
+        document is not None
+        and document.fetch_path == "syndication"
+        and is_incomplete_syndication_payload(document.raw)
+    ):
+        # Older caches may contain a valid but truncated Syndication preview.
+        # It is not a usable cache hit; keep the file for diagnosis and fetch a
+        # complete representation through the normal configured fallback chain.
+        document = None
+        attempts = [
+            {
+                "path": "cache",
+                "status": "failed",
+                "elapsed_ms": 0,
+                "reason": "长推文缓存仅包含截断预览",
+            }
+        ]
     if document is None:
         if _fetcher is not None:
             fetched = _fetcher.fetch(route, lang)
@@ -106,15 +124,17 @@ def convert(
             order = _normalize_fetch_order(fetch_order, route)
             pipeline = FetchPipeline(adapter.build_fetchers(policy=network_policy, cookies=cookies))
             fetched, recorded = pipeline.fetch(route, lang, order)
-            attempts = [
-                {
-                    "path": item.path,
-                    "status": item.status,
-                    "elapsed_ms": item.elapsed_ms,
-                    "reason": item.reason,
-                }
-                for item in recorded
-            ]
+            attempts.extend(
+                [
+                    {
+                        "path": item.path,
+                        "status": item.status,
+                        "elapsed_ms": item.elapsed_ms,
+                        "reason": item.reason,
+                    }
+                    for item in recorded
+                ]
+            )
         fetched_at = clock() if clock is not None else fetched.fetched_at
         parser = adapter.parser_map().get(fetched.raw_kind)
         if parser is None:

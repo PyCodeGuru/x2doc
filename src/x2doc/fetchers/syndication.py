@@ -108,6 +108,11 @@ class SyndicationFetcher:
             raise RenderError("Syndication 响应为空或缺少推文标识")
         if isinstance(payload.get("article"), dict):
             raise RenderError("Syndication 只返回 Article 预览，需降级获取完整正文")
+        if is_incomplete_syndication_payload(payload):
+            # The endpoint exposes only a note id when its legacy ``text``
+            # field is a truncated preview. Treat this as a failed fetch so
+            # the pipeline can continue to a mirror that has the full note.
+            raise RenderError("Syndication 返回的长推文正文不完整，需降级获取")
         return payload
 
     def _wait_seconds(self, retry_state: Any) -> float:
@@ -136,3 +141,21 @@ def _parse_retry_after(value: str | None) -> float | None:
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def is_incomplete_syndication_payload(payload: dict[str, Any]) -> bool:
+    """Return whether Syndication advertises a note but omits its full text."""
+
+    note = payload.get("note_tweet")
+    if not isinstance(note, dict):
+        return False
+    direct_candidates = (note.get("text"), note.get("full_text"))
+    if any(isinstance(value, str) and value.strip() for value in direct_candidates):
+        return False
+    result = note.get("note_tweet_results")
+    result = result.get("result") if isinstance(result, dict) else None
+    if isinstance(result, dict):
+        nested_candidates = (result.get("text"), result.get("full_text"))
+        if any(isinstance(value, str) and value.strip() for value in nested_candidates):
+            return False
+    return True

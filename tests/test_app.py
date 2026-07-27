@@ -7,10 +7,12 @@ from typing import Any
 import pytest
 
 from x2doc.app import build_output_dir, convert
+from x2doc.cache import SCHEMA_VERSION, CacheEnvelope, cache_path, write_cache
 from x2doc.errors import ParameterError
 from x2doc.fetchers.base import FetchResult
 from x2doc.models import Document
 from x2doc.parsers.tweet_json import parse_syndication_tweet
+from x2doc.routing import resolve_route
 
 
 class FixtureFetcher:
@@ -82,6 +84,69 @@ def test_cache_hit_regenerates_without_fetching(tmp_path: Path, load_json) -> No
     )
 
     assert second.outputs["md"].is_file()
+
+
+def test_truncated_syndication_cache_is_bypassed_for_complete_mirror_content(
+    tmp_path: Path, load_json
+) -> None:
+    raw = load_json("syndication/single_image.json")
+    raw["id_str"] = "2056590419366932809"
+    raw["text"] = "几个真正牛的点：\n① https://t.co/image"
+    raw["note_tweet"] = {"id": "opaque-note-id"}
+    document = parse_syndication_tweet(
+        raw,
+        "https://x.com/TianjiOracle/status/2056590419366932809",
+        datetime(2026, 7, 27, tzinfo=UTC),
+    )
+    cache_root = tmp_path / "cache"
+    route = resolve_route(document.source_url)
+    write_cache(
+        cache_path(cache_root, route),
+        CacheEnvelope(
+            schema_version=SCHEMA_VERSION,
+            platform=document.platform,
+            route=route.kind,
+            fetch_path="syndication",
+            raw_kind="syndication_tweet",
+            fetched_at=document.fetched_at,
+            raw=raw,
+            document=document.model_dump(mode="json"),
+        ),
+    )
+
+    class CompleteMirrorFetcher:
+        def fetch(self, route, _lang):
+            return FetchResult(
+                route=route,
+                fetch_path="fxtwitter",
+                raw_kind="fxtwitter_json",
+                fetched_at=datetime(2026, 7, 27, tzinfo=UTC),
+                raw={
+                    "tweet": {
+                        "id": route.source_id,
+                        "text": "preview",
+                        "note_tweet": {"text": "① 完整第一项\n② 完整第二项"},
+                        "created_at": "Tue May 19 04:19:00 +0000 2026",
+                        "lang": "zh",
+                        "author": {"screen_name": "TianjiOracle", "name": "TianjiOracle"},
+                    }
+                },
+            )
+
+    result = convert(
+        document.source_url,
+        out=tmp_path / "output",
+        cache_dir=cache_root,
+        images="none",
+        thread="off",
+        _fetcher=CompleteMirrorFetcher(),
+    )
+
+    markdown = result.outputs["md"].read_text(encoding="utf-8")
+    assert "1. 完整第一项" in markdown
+    assert "2. 完整第二项" in markdown
+    assert result.fetch_path == "fxtwitter"
+    assert result.fetch_attempts[0]["reason"] == "长推文缓存仅包含截断预览"
 
 
 def test_existing_output_requires_overwrite(tmp_path: Path, load_json) -> None:

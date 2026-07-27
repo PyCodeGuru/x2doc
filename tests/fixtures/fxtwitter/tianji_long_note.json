@@ -1,0 +1,30 @@
+{
+  "code": 200,
+  "message": "OK",
+  "tweet": {
+    "id": "2056590419366932809",
+    "text": "个人知识库的天花板来了！ \n\nGitHub上这个 LLM Wiki 项目已经 2800+ Star，直接把普通RAG甩几条街！\n它不是每次都“重新检索”的低效模式，而是让AI直接帮你增量构建一个真正的结构化Wiki —— 知识编译一次，就持续进化、越用越聪明！\n\n几个真正牛的点：\n① 四信号知识图谱：自动建立高质量关联，不是乱连，有算法支撑\n② Louvain社区检测：自动发现知识簇，帮你挖出自己都没意识到的盲区\n③ Chrome一键剪藏：看到好网页直接扔进知识库\n④ 完美兼容Obsidian：三栏布局，颜值和体验都在线做研究、写笔记、搞个人第二大脑的朋友，这项目真的值得重度冲！\n\nGitHub地址：https://github.com/nashsu/llm_wiki\n想把碎片知识变成系统智慧的，这波必须收藏！",
+    "created_at": "Tue May 19 04:19:00 +0000 2026",
+    "lang": "zh",
+    "is_note_tweet": true,
+    "author": {
+      "screen_name": "TianjiOracle",
+      "name": "TianjiOracle",
+      "avatar_url": "https://pbs.twimg.com/profile_images/2080812067112587264/M-i00IBy_200x200.jpg"
+    },
+    "replies": 44,
+    "retweets": 109,
+    "likes": 446,
+    "media": {
+      "photos": [
+        {
+          "type": "photo",
+          "id": "2056378418682376192",
+          "url": "https://pbs.twimg.com/media/HIm5RtFXsAA93cN.jpg?name=orig",
+          "width": 1551,
+          "height": 946
+        }
+      ]
+    }
+  }
+}

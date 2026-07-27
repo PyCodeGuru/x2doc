@@ -7,7 +7,7 @@ platform: "x"
 source_url: "https://x.com/TianjiOracle/status/2056590419366932809"
 published_at: "2026-05-19T12:19:00+08:00"
 published_at_utc: "2026-05-19T04:19:00+00:00"
-fetched_at: "2026-07-27T19:32:47.756719+08:00"
+fetched_at: "2026-07-27T19:25:38+08:00"
 fetch_path: "fxtwitter"
 lang: "zh"
 images_count: 1
@@ -30,9 +30,9 @@ GitHub上这个 LLM Wiki 项目已经 2800+ Star，直接把普通RAG甩几条�
 GitHub地址：[github.com/nashsu/llm_wiki](https://github.com/nashsu/llm_wiki)
 想把碎片知识变成系统智慧的，这波必须收藏！
 
-![图 1](assets/001-d98bec19.jpg)
+![图 1](assets/001-fixture.jpg)
 
 <!-- x2doc:source -->
 
 > 原文链接：[查看原文](https://x.com/TianjiOracle/status/2056590419366932809)
-> 抓取时间：2026-07-27T19:32:47.756719+08:00
+> 抓取时间：2026-07-27T19:25:38+08:00

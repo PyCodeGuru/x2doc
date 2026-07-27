@@ -1,7 +1,26 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from x2doc.models import CodeBlock, HeadingBlock, ListBlock
 from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
+from x2doc.renderers.markdown import render_markdown
+
+
+def test_real_tianji_long_note_preserves_full_text_list_link_and_image(load_json) -> None:
+    document = parse_fxtwitter_tweet(
+        load_json("fxtwitter/tianji_long_note.json"),
+        "https://x.com/TianjiOracle/status/2056590419366932809",
+        datetime.fromisoformat("2026-07-27T11:25:38+00:00"),
+    )
+    document.media[0].local_path = "assets/001-fixture.jpg"
+
+    markdown = render_markdown(document)
+    golden = (Path(__file__).parent / "golden" / "tianji_long_note.md").read_text(encoding="utf-8")
+
+    assert markdown == golden
+    assert "1. 四信号知识图谱" in markdown
+    assert "4. 完美兼容Obsidian" in markdown
+    assert "https://github.com/nashsu/llm_wiki" in markdown
 
 
 def test_fxtwitter_article_content_preserves_structure() -> None:

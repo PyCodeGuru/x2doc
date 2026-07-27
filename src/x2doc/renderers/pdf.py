@@ -61,6 +61,15 @@ def render_pdf(
             try:
                 page = browser.new_page()
                 page.set_content(document_html, wait_until="load")
+                failed_images = page.locator("img").evaluate_all(
+                    """images => images
+                        .filter(image => !image.complete || image.naturalWidth === 0)
+                        .map(image => image.getAttribute('src') || '')"""
+                )
+                if failed_images:
+                    # Never silently emit a PDF with broken-image placeholders.
+                    preview = ", ".join(str(value)[:120] for value in failed_images[:3])
+                    raise RenderError(f"PDF 图片加载失败: {preview}")
                 page.emulate_media(media="print")
                 output.parent.mkdir(parents=True, exist_ok=True)
                 page.pdf(
