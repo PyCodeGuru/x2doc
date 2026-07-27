@@ -24,7 +24,28 @@ def test_shell_entry_requires_exactly_one_url(arguments: list[str]) -> None:
     )
 
     assert result.returncode == 1
-    assert "必须提供一个" in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["exit_code"] == 1
+    assert "必须提供一个" in payload["message"]
+
+
+def test_shell_entry_reports_missing_python_as_exit_four_json(tmp_path: Path) -> None:
+    env = {**os.environ, "X2DOC_PUBLISH_PYTHON": str(tmp_path / "missing-python")}
+
+    result = subprocess.run(
+        [str(SHELL_ENTRY), "https://x.com/user/status/123"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 4
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["exit_code"] == 4
+    assert "Python" in payload["message"]
 
 
 def test_shell_entry_forwards_url_as_one_literal_argument(tmp_path: Path) -> None:
@@ -122,4 +143,3 @@ def test_python_main_rejects_wrong_argument_count(capsys: pytest.CaptureFixture[
     assert publisher.urls == []
     assert payload["status"] == "error"
     assert payload["exit_code"] == 1
-

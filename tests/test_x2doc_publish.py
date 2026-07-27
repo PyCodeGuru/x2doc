@@ -381,12 +381,20 @@ def test_parse_conversion_output_redacts_credentials_on_failure() -> None:
 
 
 class ScriptedRunner:
-    def __init__(self, *, staged: str, push_code: int = 0) -> None:
+    def __init__(
+        self,
+        *,
+        staged: str,
+        push_code: int = 0,
+        committed_paths: str | None = None,
+    ) -> None:
         self.staged = staged
+        self.committed_paths = committed_paths if committed_paths is not None else staged
         self.push_code = push_code
         self.calls: list[tuple[tuple[str, ...], Path]] = []
         self.committed = False
         self.remote_updated = False
+        self.registered_worktree: Path | None = None
 
     def run(self, args, *, cwd, env=None) -> CommandResult:
         del env
@@ -396,6 +404,9 @@ class ScriptedRunner:
             return CommandResult(0, "PyCodeGuru\n", "")
         if command[:3] == ("git", "remote", "get-url"):
             return CommandResult(0, "https://github.com/PyCodeGuru/x2doc.git\n", "")
+        if command[:3] == ("git", "worktree", "list"):
+            path = self.registered_worktree or Path("/unregistered")
+            return CommandResult(0, f"worktree {path}\0HEAD basecommit\0detached\0\0", "")
         if command[:3] == ("git", "status", "--porcelain"):
             return CommandResult(0, "", "")
         if command[:3] == ("git", "rev-parse", "HEAD"):
@@ -404,6 +415,8 @@ class ScriptedRunner:
             return CommandResult(0, "newcommit\n" if self.remote_updated else "basecommit\n", "")
         if command[:4] == ("git", "diff", "--cached", "--name-only"):
             return CommandResult(0, self.staged, "")
+        if command[:4] == ("git", "diff", "--name-only", "-z") and command[-1] == "HEAD^..HEAD":
+            return CommandResult(0, self.committed_paths, "")
         if command[:2] == ("git", "commit"):
             self.committed = True
             return CommandResult(0, "committed\n", "")
@@ -439,6 +452,7 @@ def _publisher_fixture(tmp_path: Path, runner: ScriptedRunner) -> Publisher:
     document.mkdir(parents=True)
     (document / "index.md").write_text("正文\n", encoding="utf-8")
     (document / "index.pdf").write_bytes(b"%PDF-1.7\n")
+    runner.registered_worktree = worktree
     return Publisher(
         PublisherConfig(
             source_repo=source,
@@ -478,6 +492,56 @@ def test_publisher_stops_before_commit_when_staged_path_escapes(tmp_path: Path) 
     commands = [call[0] for call in runner.calls]
     assert not any(command[:2] == ("git", "commit") for command in commands)
     assert not any(command[:2] == ("git", "push") for command in commands)
+
+
+def test_publisher_stops_before_push_when_committed_path_escapes(tmp_path: Path) -> None:
+    safe = "output/x/user-title/index.md\0output/x/user-title/index.pdf\0"
+    runner = ScriptedRunner(
+        staged=safe,
+        committed_paths=safe + "src/x2doc/app.py\0",
+    )
+    publisher = _publisher_fixture(tmp_path, runner)
+
+    with pytest.raises(PublishError, match="越界"):
+        publisher.publish("https://x.com/user/status/1")
+
+    commands = [call[0] for call in runner.calls]
+    assert any(command[:2] == ("git", "commit") for command in commands)
+    assert not any(command[:2] == ("git", "push") for command in commands)
+
+
+def test_publisher_rejects_symlinked_publisher_worktree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    external = tmp_path / "daily-repo"
+    worktree = tmp_path / "publisher"
+    (source / ".git").mkdir(parents=True)
+    (external / ".git").mkdir(parents=True)
+    worktree.symlink_to(external, target_is_directory=True)
+    runner = ScriptedRunner(staged="")
+    publisher = Publisher(
+        PublisherConfig(
+            source_repo=source,
+            worktree=worktree,
+            lock_dir=tmp_path / "publisher.lock",
+            pending_state=tmp_path / "pending.json",
+            x2doc_executable=Path("/fake/x2doc"),
+            prepare_runtime=False,
+        ),
+        runner=runner,
+        proxy_provider=lambda: None,
+    )
+
+    with pytest.raises(PublishError, match="符号链接"):
+        publisher.publish("https://x.com/user/status/1")
+
+
+def test_publisher_rejects_existing_unregistered_worktree(tmp_path: Path) -> None:
+    runner = ScriptedRunner(staged="")
+    publisher = _publisher_fixture(tmp_path, runner)
+    runner.registered_worktree = tmp_path / "different-worktree"
+
+    with pytest.raises(PublishError, match="未注册"):
+        publisher.publish("https://x.com/user/status/1")
 
 
 def test_publisher_reuses_head_without_commit_when_output_has_no_changes(tmp_path: Path) -> None:

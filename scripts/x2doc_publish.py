@@ -233,6 +233,15 @@ class Publisher:
                     ),
                     "Git 创建发布提交失败",
                 )
+                committed_result = self.runner.run(
+                    ["git", "diff", "--name-only", "-z", "HEAD^..HEAD"],
+                    cwd=self.config.worktree,
+                )
+                self._require(committed_result, "Git 审计发布提交失败")
+                committed_paths = [
+                    value for value in committed_result.stdout.split("\0") if value
+                ]
+                validate_staged_paths(committed_paths, relative_dir)
                 pending_commit = self._stdout(
                     self.runner.run(["git", "rev-parse", "HEAD"], cwd=self.config.worktree),
                     "Git 无法读取待 push 提交哈希",
@@ -330,7 +339,10 @@ class Publisher:
         if not (source / ".git").exists():
             raise PublishError(f"x2doc 源仓库不存在: {source}", exit_code=4)
         self._verify_identity(source, network_env)
+        if self.config.worktree.is_symlink():
+            raise PublishError("发布 worktree 根目录不允许为符号链接")
         if (self.config.worktree / ".git").exists():
+            self._verify_registered_worktree()
             return
         if self.config.worktree.exists() and any(self.config.worktree.iterdir()):
             raise PublishError(f"发布 worktree 路径已被占用: {self.config.worktree}")
@@ -352,6 +364,30 @@ class Publisher:
             ),
             "创建隔离发布 worktree 失败",
         )
+        self._verify_registered_worktree()
+
+    def _verify_registered_worktree(self) -> None:
+        """Require the fixed path to be a linked worktree owned by source_repo."""
+
+        git_marker = self.config.worktree / ".git"
+        if not git_marker.is_file():
+            raise PublishError("发布路径不是隔离 Git worktree")
+        result = self.runner.run(
+            ["git", "worktree", "list", "--porcelain", "-z"],
+            cwd=self.config.source_repo,
+        )
+        self._require(result, "无法核验发布 worktree 注册信息")
+        try:
+            expected = self.config.worktree.resolve()
+            registered = {
+                Path(field.removeprefix("worktree ")).resolve()
+                for field in result.stdout.split("\0")
+                if field.startswith("worktree ")
+            }
+        except (OSError, RuntimeError) as exc:
+            raise PublishError("无法安全解析发布 worktree 注册信息") from exc
+        if expected not in registered:
+            raise PublishError("固定发布路径未注册为 x2doc 的隔离 worktree")
 
     def _verify_identity(self, repo: Path, network_env: dict[str, str]) -> None:
         login = self._stdout(
