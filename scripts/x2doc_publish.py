@@ -641,3 +641,53 @@ def redact_sensitive(value: str) -> str:
 
 def _safe_detail(result: CommandResult) -> str:
     return redact_sensitive((result.stderr or result.stdout).strip())
+
+
+def _print_json(payload: dict[str, object]) -> None:
+    """Emit exactly one machine-readable line for the Codex skill."""
+
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+
+
+def main(argv: list[str] | None = None, *, publisher: Publisher | None = None) -> int:
+    """Publish one URL and return a stable JSON/exit-code contract."""
+
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if len(arguments) != 1:
+        _print_json(
+            {
+                "status": "error",
+                "exit_code": 1,
+                "message": "必须提供一个 X 或微信公众号链接",
+            }
+        )
+        return 1
+
+    active_publisher = publisher or Publisher()
+    try:
+        result = active_publisher.publish(arguments[0])
+    except PublishError as exc:
+        _print_json(
+            {
+                "status": "error",
+                "exit_code": exc.exit_code,
+                "message": redact_sensitive(str(exc)),
+            }
+        )
+        return exc.exit_code
+    except Exception as exc:  # Keep mobile output useful without leaking a traceback.
+        _print_json(
+            {
+                "status": "error",
+                "exit_code": 5,
+                "message": f"发布程序异常: {redact_sensitive(str(exc))}",
+            }
+        )
+        return 5
+
+    _print_json(result.as_dict())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

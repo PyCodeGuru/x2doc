@@ -20,6 +20,16 @@ cd /Users/paipai_tm/Work/tools/x2doc && .venv/bin/x2doc 'https://mp.weixin.qq.co
 
 完整说明见 [docs/使用指南.md](docs/使用指南.md)。
 
+## iPhone KittyLitter 一句话转换并发布
+
+在 iPhone 的 KittyLitter 中进入 Codex 对话，发送：
+
+```text
+帮我调用 x2doc，把这个链接 https://x.com/yanhua1010/status/2039966047378583815 转成 Markdown 和 PDF，并上传到 GitHub。
+```
+
+把句子里的链接换成你的 X 或微信公众号文章链接。Codex 会调用固定发布脚本，只提交本次生成的 `output/` 目录，并返回 Markdown、PDF、GitHub 目录链接和提交哈希。完整操作与报错处理见 [docs/使用指南.md](docs/使用指南.md#在-iphone-kittylitter-中转换并上传)。
+
 `x2doc` 是一个本地 CLI/Python 库，用于把 X（Twitter）和微信公众号文章转换为结构化 Markdown 与 A4 PDF。
 
 公开推文默认按 `cache,syndication,fxtwitter,vxtwitter,playwright` 降级；Article URL 直接进入 Playwright。抓取结果统一归一化为 `Document`，再输出 Markdown、HTML 中间表示与 PDF。
