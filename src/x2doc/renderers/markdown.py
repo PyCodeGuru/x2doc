@@ -6,7 +6,6 @@ import json
 import re
 from urllib.parse import urlsplit
 
-from x2doc.cache import SCHEMA_VERSION
 from x2doc.models import (
     Block,
     CodeBlock,
@@ -60,10 +59,11 @@ def _front_matter(document: Document) -> str:
     tags = _extract_tags(document)
     lines = [
         "---",
-        f"schema_version: {SCHEMA_VERSION}",
+        "schema_version: 1",
         f"title: {_yaml_string(document.title)}",
         f"author: {_yaml_string(document.author.display_name)}",
         f"handle: {_yaml_string(document.author.handle)}",
+        f"platform: {_yaml_string(document.platform.value)}",
         f"source_url: {_yaml_string(document.source_url)}",
         f"published_at: {_yaml_string(document.published_at.isoformat())}",
         f"published_at_utc: {_yaml_string(document.published_at_utc.isoformat())}",

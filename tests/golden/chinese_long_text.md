@@ -3,6 +3,7 @@ schema_version: 1
 title: "Claude Code 中文长文测试"
 author: "中文作者"
 handle: "zh_author"
+platform: "x"
 source_url: "https://x.com/zh_author/status/2000000000000000001"
 published_at: "2026-07-26T09:02:03+08:00"
 published_at_utc: "2026-07-26T01:02:03+00:00"

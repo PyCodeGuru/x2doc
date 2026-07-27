@@ -77,6 +77,7 @@ def test_cli_local_images_use_stub_deduplicate_and_fallback(tmp_path: Path, monk
             stored_cache,
             CacheEnvelope(
                 schema_version=SCHEMA_VERSION,
+                platform="x",
                 route="tweet",
                 fetch_path="syndication",
                 raw_kind="syndication_tweet",
@@ -93,7 +94,7 @@ def test_cli_local_images_use_stub_deduplicate_and_fallback(tmp_path: Path, monk
         )
 
         assert result.exit_code == 0, result.stdout
-        output_dir = tmp_path / "out" / "local_author-20260726-本地图片端到端测试"
+        output_dir = tmp_path / "out" / "x" / "local_author-20260726-本地图片端到端测试"
         assets = list((output_dir / "assets").iterdir())
         expected_hash = hashlib.sha256(_IMAGE_BYTES).hexdigest()[:8]
         assert [path.name for path in assets] == [f"001-{expected_hash}.png"]

@@ -11,6 +11,7 @@ from x2doc.cache import (
     cache_path,
     load_cache,
     load_or_reparse,
+    migrate_v1_cache,
     write_cache,
 )
 from x2doc.models import Document
@@ -23,6 +24,7 @@ def _envelope(
 ) -> CacheEnvelope:
     return CacheEnvelope(
         schema_version=version,
+        platform="x",
         route="tweet",
         fetch_path="syndication",
         raw_kind="syndication_tweet",
@@ -40,10 +42,10 @@ def _document(raw: dict[str, Any]) -> Document:
     )
 
 
-def test_cache_key_includes_route(tmp_path: Path) -> None:
+def test_cache_key_is_nested_by_platform(tmp_path: Path) -> None:
     route = resolve_route("https://x.com/apimctestface/status/1253775785153884161")
 
-    assert cache_path(tmp_path, route).name == "tweet-1253775785153884161.json"
+    assert cache_path(tmp_path, route) == tmp_path / "x" / "1253775785153884161.json"
 
 
 def test_cache_envelope_has_exact_top_level_keys(tmp_path: Path, load_json) -> None:
@@ -55,6 +57,7 @@ def test_cache_envelope_has_exact_top_level_keys(tmp_path: Path, load_json) -> N
 
     assert set(stored) == {
         "schema_version",
+        "platform",
         "route",
         "fetch_path",
         "raw_kind",
@@ -123,3 +126,31 @@ def test_corrupt_cache_is_preserved_as_miss(tmp_path: Path) -> None:
 
     assert load_cache(path) is None
     assert path.read_text(encoding="utf-8") == "not-json"
+
+
+def test_v1_file_migrates_offline_and_preserves_legacy(tmp_path: Path, load_json) -> None:
+    raw = load_json("syndication/single_image.json")
+    document = _document(raw)
+    route = resolve_route(document.source_url)
+    legacy = tmp_path / f"tweet-{route.source_id}.json"
+    legacy.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "route": "tweet",
+                "fetch_path": "syndication",
+                "raw_kind": "syndication_tweet",
+                "fetched_at": document.fetched_at.isoformat(),
+                "raw": raw,
+                "document": document.model_dump(mode="json"),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    migrated = migrate_v1_cache(tmp_path, route)
+
+    assert migrated == tmp_path / "x" / f"{route.source_id}.json"
+    assert load_cache(migrated).platform.value == "x"
+    assert legacy.exists()
+    assert legacy.with_suffix(".json.migrated-v2").exists()

@@ -49,7 +49,7 @@ def test_convert_writes_expected_output_and_cache(tmp_path: Path, load_json) -> 
     assert result.output_dir.name == "apimctestface-20200425-testing-something"
     assert result.outputs["md"] == result.output_dir / "index.md"
     assert result.outputs["md"].is_file()
-    assert result.cache_path.name == "tweet-1253775785153884161.json"
+    assert result.cache_path == tmp_path / "cache" / "x" / "1253775785153884161.json"
     assert result.cache_path.is_file()
     assert result.fetch_path == "syndication"
     assert any("--cookies" in warning for warning in result.warnings)

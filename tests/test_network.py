@@ -4,10 +4,31 @@ import pytest
 
 from x2doc.errors import ParameterError
 from x2doc.network import (
+    DEFAULT_NO_PROXY_DOMAINS,
+    NetworkPolicy,
     build_http_client,
     build_playwright_proxy,
     resolve_proxy,
 )
+
+
+def test_network_policy_bypasses_wechat_domains() -> None:
+    proxy = resolve_proxy("http://127.0.0.1:7892", environ={})
+    policy = NetworkPolicy(proxy=proxy, no_proxy_domains=DEFAULT_NO_PROXY_DOMAINS)
+
+    assert policy.proxy_for("https://x.com/robots.txt") is proxy
+    assert policy.proxy_for("https://mp.weixin.qq.com/s/token") is None
+    assert policy.proxy_for("https://mmbiz.qpic.cn/image") is None
+
+
+def test_no_proxy_domains_accept_repeatable_comma_separated_values() -> None:
+    from x2doc.network import parse_no_proxy_domains
+
+    assert parse_no_proxy_domains(["a.test,b.test", "c.test"]) == {
+        "a.test",
+        "b.test",
+        "c.test",
+    }
 
 
 def test_proxy_precedence_is_cli_then_x2doc_then_https_then_all() -> None:

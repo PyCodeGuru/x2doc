@@ -14,6 +14,7 @@ from x2doc.fetchers.base import HTTP_TIMEOUT_SECONDS, USER_AGENT
 
 _SUPPORTED_PROXY_SCHEMES = {"http", "https", "socks5"}
 _DEFAULT_PORTS = {"http": 80, "https": 443, "socks5": 1080}
+DEFAULT_NO_PROXY_DOMAINS = frozenset({"mp.weixin.qq.com", "mmbiz.qpic.cn", "res.wx.qq.com"})
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -42,6 +43,33 @@ class ProxyConfig:
 
     def __repr__(self) -> str:
         return f"ProxyConfig(redacted={self.redacted!r})"
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkPolicy:
+    proxy: ProxyConfig | None
+    no_proxy_domains: frozenset[str] = DEFAULT_NO_PROXY_DOMAINS
+
+    def proxy_for(self, url: str) -> ProxyConfig | None:
+        host = (urlsplit(url).hostname or "").lower()
+        if any(host == domain or host.endswith(f".{domain}") for domain in self.no_proxy_domains):
+            return None
+        return self.proxy
+
+    def describe(self, url: str) -> str:
+        selected = self.proxy_for(url)
+        return selected.redacted if selected else "直连"
+
+
+def parse_no_proxy_domains(values: list[str] | tuple[str, ...] | None) -> frozenset[str]:
+    if not values:
+        return DEFAULT_NO_PROXY_DOMAINS
+    return frozenset(
+        item.strip().lower().lstrip(".")
+        for value in values
+        for item in value.split(",")
+        if item.strip()
+    )
 
 
 def resolve_proxy(

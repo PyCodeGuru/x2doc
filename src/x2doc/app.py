@@ -18,6 +18,7 @@ from x2doc.cache import (
     cache_path,
     default_cache_dir,
     load_or_reparse,
+    migrate_v1_cache,
     write_cache,
 )
 from x2doc.errors import DependencyError, ParameterError
@@ -28,13 +29,13 @@ from x2doc.fetchers.playwright import PlaywrightArticleFetcher
 from x2doc.fetchers.syndication import SyndicationFetcher
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
-from x2doc.network import resolve_proxy
+from x2doc.network import NetworkPolicy, parse_no_proxy_domains, resolve_proxy
 from x2doc.parsers.article_dom import parse_article_dom
 from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
 from x2doc.parsers.tweet_json import parse_syndication_tweet
 from x2doc.renderers.markdown import render_markdown
 from x2doc.renderers.pdf import render_pdf
-from x2doc.routing import Route, resolve_route
+from x2doc.routing import Route, resolve_target
 from x2doc.thread import complete_thread
 
 ThreadMode = Literal["auto", "on", "off"]
@@ -62,6 +63,7 @@ def convert(
     thread: ThreadMode = "auto",
     cookies: str | Path | None = None,
     proxy: str | None = None,
+    no_proxy_domains: Sequence[str] | None = None,
     fetch_order: Sequence[str] | str = DEFAULT_FETCH_ORDER,
     cache_dir: str | Path | None = None,
     clock: Clock | None = None,
@@ -73,7 +75,14 @@ def convert(
     requested_formats = _normalize_formats(formats)
     if images == "none" and "pdf" in requested_formats:
         raise ParameterError("--images none 与 PDF 输出互斥，请改用 local 或 embed")
-    route = resolve_route(url)
+    route = resolve_target(url)
+    network_policy = NetworkPolicy(
+        proxy=resolve_proxy(proxy),
+        no_proxy_domains=parse_no_proxy_domains(
+            list(no_proxy_domains) if no_proxy_domains else None
+        ),
+    )
+    route_proxy = network_policy.proxy_for(route.canonical_url)
     cache_root = Path(cache_dir) if cache_dir is not None else default_cache_dir()
     resolved_cache_path = cache_path(cache_root, route)
     document = None
@@ -82,7 +91,15 @@ def convert(
             resolved_cache_path,
             expected_route=route.kind,
             source_url=route.canonical_url,
+            expected_platform=route.platform,
         )
+        if document is None and migrate_v1_cache(cache_root, route) is not None:
+            document = load_or_reparse(
+                resolved_cache_path,
+                expected_route=route.kind,
+                source_url=route.canonical_url,
+                expected_platform=route.platform,
+            )
 
     attempts: list[dict[str, str | int]] = (
         [{"path": "cache", "status": "success", "elapsed_ms": 0, "reason": ""}]
@@ -90,7 +107,7 @@ def convert(
         else []
     )
     if document is None:
-        proxy_config = resolve_proxy(proxy)
+        proxy_config = route_proxy
         if _fetcher is not None:
             fetched = _fetcher.fetch(route, lang)
         else:
@@ -127,6 +144,7 @@ def convert(
             resolved_cache_path,
             CacheEnvelope(
                 schema_version=SCHEMA_VERSION,
+                platform=route.platform,
                 route=route.kind,
                 fetch_path=fetched.fetch_path,
                 raw_kind=fetched.raw_kind,
@@ -158,7 +176,7 @@ def convert(
             document,
             output_dir,
             images,
-            proxy=resolve_proxy(proxy),
+            proxy=route_proxy,
         )
     warnings.extend(thread_warnings)
     if thread != "off" and cookies is None:
@@ -176,7 +194,7 @@ def convert(
             title=localized.title,
             output=pdf_path,
             base_dir=output_dir,
-            proxy=resolve_proxy(proxy),
+            proxy=route_proxy,
         )
         outputs["pdf"] = pdf_path
 
@@ -209,7 +227,7 @@ def build_output_dir(root: Path, document: Document) -> Path:
     title_slug = slugify(document.title, allow_unicode=True, max_length=40)
     if not title_slug:
         title_slug = f"tweet-{document.source_id}"
-    return root / f"{handle}-{date}-{title_slug}"
+    return root / document.platform.value / f"{handle}-{date}-{title_slug}"
 
 
 def _normalize_formats(formats: Sequence[str] | None) -> tuple[str, ...]:

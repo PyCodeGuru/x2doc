@@ -12,13 +12,13 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from x2doc.models import Document, StrictModel
+from x2doc.models import Document, Platform, StrictModel
 from x2doc.parsers.article_dom import parse_article_dom
 from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
 from x2doc.parsers.tweet_json import parse_syndication_tweet
 from x2doc.routing import Route
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 RawParser = Callable[[dict[str, Any], str, datetime], Document]
 RAW_PARSERS: dict[str, RawParser] = {
     "syndication_tweet": parse_syndication_tweet,
@@ -30,6 +30,7 @@ RAW_PARSERS: dict[str, RawParser] = {
 
 class CacheEnvelope(StrictModel):
     schema_version: int
+    platform: Platform
     route: str
     fetch_path: str
     raw_kind: str
@@ -43,9 +44,9 @@ def default_cache_dir() -> Path:
 
 
 def cache_path(cache_dir: Path, route: Route) -> Path:
-    """Include route kind in every key to prevent cross-resource collisions."""
+    """Nest cache keys by platform to prevent cross-platform collisions."""
 
-    return cache_dir / f"{route.kind}-{route.source_id}.json"
+    return cache_dir / route.platform.value / f"{route.source_id}.json"
 
 
 def load_cache(path: Path) -> CacheEnvelope | None:
@@ -80,11 +81,21 @@ def write_cache(path: Path, envelope: CacheEnvelope) -> None:
         raise
 
 
-def load_or_reparse(path: Path, *, expected_route: str, source_url: str) -> Document | None:
+def load_or_reparse(
+    path: Path,
+    *,
+    expected_route: str,
+    source_url: str,
+    expected_platform: Platform | str = Platform.X,
+) -> Document | None:
     """Load a current document or reparse stale raw data without networking."""
 
     envelope = load_cache(path)
-    if envelope is None or envelope.route != expected_route:
+    if (
+        envelope is None
+        or envelope.route != expected_route
+        or envelope.platform != Platform(expected_platform)
+    ):
         return None
     if envelope.schema_version == SCHEMA_VERSION:
         try:
@@ -103,6 +114,7 @@ def load_or_reparse(path: Path, *, expected_route: str, source_url: str) -> Docu
         path,
         CacheEnvelope(
             schema_version=SCHEMA_VERSION,
+            platform=envelope.platform,
             route=envelope.route,
             fetch_path=envelope.fetch_path,
             raw_kind=envelope.raw_kind,
@@ -112,3 +124,40 @@ def load_or_reparse(path: Path, *, expected_route: str, source_url: str) -> Docu
         ),
     )
     return document
+
+
+def migrate_v1_cache(cache_dir: Path, route: Route) -> Path | None:
+    """Reparse a legacy X envelope locally and preserve the old file with a marker."""
+
+    if route.platform is not Platform.X:
+        return None
+    legacy = cache_dir / f"{route.kind}-{route.source_id}.json"
+    destination = cache_path(cache_dir, route)
+    if destination.exists() or not legacy.exists():
+        return destination if destination.exists() else None
+    try:
+        payload = json.loads(legacy.read_text(encoding="utf-8"))
+        parser = RAW_PARSERS.get(str(payload.get("raw_kind", "")))
+        fetched_at = datetime.fromisoformat(str(payload["fetched_at"]))
+        raw = payload["raw"]
+        if parser is None or not isinstance(raw, dict):
+            return None
+        document = parser(raw, route.canonical_url, fetched_at)
+        write_cache(
+            destination,
+            CacheEnvelope(
+                schema_version=SCHEMA_VERSION,
+                platform=Platform.X,
+                route=route.kind,
+                fetch_path=str(payload["fetch_path"]),
+                raw_kind=str(payload["raw_kind"]),
+                fetched_at=document.fetched_at,
+                raw=raw,
+                document=document.model_dump(mode="json"),
+            ),
+        )
+        marker = legacy.with_suffix(legacy.suffix + ".migrated-v2")
+        marker.write_text(str(destination) + "\n", encoding="utf-8")
+        return destination
+    except (KeyError, OSError, ValueError, TypeError):
+        return None

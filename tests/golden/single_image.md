@@ -3,6 +3,7 @@ schema_version: 1
 title: "Testing something"
 author: "API McTestface"
 handle: "apimctestface"
+platform: "x"
 source_url: "https://x.com/apimctestface/status/1253775785153884161"
 published_at: "2020-04-25T04:00:15+08:00"
 published_at_utc: "2020-04-24T20:00:15+00:00"

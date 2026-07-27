@@ -77,6 +77,13 @@ def main(
         str | None,
         typer.Option("--proxy", help="HTTP/HTTPS/SOCKS5 代理地址"),
     ] = None,
+    no_proxy_domains: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--no-proxy-domains",
+            help="直连域名，可重复或用逗号分隔",
+        ),
+    ] = None,
     fetch_order: Annotated[
         str,
         typer.Option("--fetch-order", help="逗号分隔的抓取降级顺序"),
@@ -115,6 +122,7 @@ def main(
             thread=thread_mode,
             cookies=cookies,
             proxy=proxy,
+            no_proxy_domains=no_proxy_domains,
             fetch_order=fetch_order,
         )
     except X2DocError as exc:

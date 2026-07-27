@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -13,6 +14,11 @@ class StrictModel(BaseModel):
     """Reject unknown fields so cache/schema drift is detected early."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class Platform(StrEnum):
+    X = "x"
+    WECHAT = "wechat"
 
 
 class Author(StrictModel):
@@ -93,7 +99,7 @@ Block = Annotated[
 class Document(StrictModel):
     source_id: str
     source_url: str
-    platform: Literal["x"] = "x"
+    platform: Platform = Platform.X
     author: Author
     title: str
     published_at: datetime
@@ -106,6 +112,7 @@ class Document(StrictModel):
     thread: list[Document] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
     fetch_path: str
+    original_link: str | None = None
 
     @field_validator("published_at", "published_at_utc", "fetched_at")
     @classmethod
