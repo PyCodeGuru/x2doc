@@ -574,6 +574,8 @@ def parse_conversion_output(result: CommandResult) -> tuple[Path, Path]:
             f"x2doc 转换失败: {_safe_detail(result)}",
             exit_code=result.returncode if result.returncode in {1, 2, 3, 4, 5} else 5,
         )
+    if "警告: 图片下载失败" in result.stdout:
+        raise PublishError("图片下载失败，已停止发布；请检查网络后重试", exit_code=3)
     values: dict[str, Path] = {}
     for line in result.stdout.splitlines():
         label, separator, value = line.partition(": ")

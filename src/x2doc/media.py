@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import os
 import queue
 import tempfile
@@ -56,15 +57,8 @@ def localize_media(
     if mode == "none" or not localized.media:
         return localized, []
 
-    # An overwrite from a cache hit must remain renderable while offline.
-    # Reuse the deterministic assets from the same output directory when all
-    # expected media files are already present.
-    if mode == "local":
-        existing = sorted((output_dir / "assets").glob("[0-9][0-9][0-9]-*"))
-        if len(existing) >= len(localized.media):
-            for media, path in zip(localized.media, existing, strict=False):
-                media.local_path = path.relative_to(output_dir).as_posix()
-            return localized, []
+    if mode == "local" and _reuse_assets(localized.media, output_dir):
+        return localized, []
 
     proxy_config = proxy if isinstance(proxy, ProxyConfig) else resolve_proxy(proxy)
     downloads = _run_coroutine(lambda: _download_all(localized.media, proxy=proxy_config))
@@ -96,7 +90,45 @@ def localize_media(
         media.local_path = relative_path
         media.mime_type = content_type
 
+    if mode == "local" and not warnings:
+        records = []
+        for item in localized.media:
+            assert item.local_path is not None
+            content = (output_dir / item.local_path).read_bytes()
+            records.append({
+                "source": hashlib.sha256(item.original_url.encode()).hexdigest(),
+                "path": item.local_path,
+                "sha256": hashlib.sha256(content).hexdigest(),
+            })
+        _atomic_write(
+            output_dir / "assets" / ".x2doc-manifest.json",
+            json.dumps(records, ensure_ascii=False).encode("utf-8"),
+        )
     return localized, warnings
+
+
+def _reuse_assets(media: list[Media], output_dir: Path) -> bool:
+    """Reuse only assets whose source and content match the saved manifest."""
+    try:
+        records = json.loads((output_dir / "assets" / ".x2doc-manifest.json").read_text())
+        if not isinstance(records, list) or len(records) != len(media):
+            return False
+        paths = []
+        assets_root = (output_dir / "assets").resolve()
+        for item, record in zip(media, records, strict=True):
+            if record["source"] != hashlib.sha256(item.original_url.encode()).hexdigest():
+                return False
+            path = (output_dir / record["path"]).resolve()
+            if not path.is_relative_to(assets_root) or not path.is_file():
+                return False
+            if hashlib.sha256(path.read_bytes()).hexdigest() != record["sha256"]:
+                return False
+            paths.append(record["path"])
+        for item, path in zip(media, paths, strict=True):
+            item.local_path = path
+        return True
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return False
 
 
 async def _download_all(

@@ -285,6 +285,18 @@ def test_parse_conversion_output_requires_markdown_and_pdf_paths() -> None:
         parse_conversion_output(CommandResult(0, "MD: output/x/a/index.md\n", ""))
 
 
+def test_publisher_rejects_incomplete_image_downloads() -> None:
+    result = CommandResult(
+        0,
+        "MD: output/x/a/index.md\nPDF: output/x/a/index.pdf\n"
+        "警告: 图片下载失败，Markdown 将回退为远程 URL: https://example.com/a.jpg\n",
+        "",
+    )
+
+    with pytest.raises(PublishError, match="图片下载失败"):
+        parse_conversion_output(result)
+
+
 def test_validate_generated_output_checks_files_and_local_image_references(tmp_path: Path) -> None:
     document = tmp_path / "output" / "x" / "doc"
     assets = document / "assets"

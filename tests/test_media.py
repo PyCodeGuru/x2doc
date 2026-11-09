@@ -60,7 +60,7 @@ def test_duplicate_media_content_reuses_first_file(tmp_path: Path, httpx_mock) -
     )
 
     assert document.media[0].local_path == document.media[1].local_path
-    assert len(list((tmp_path / "assets").iterdir())) == 1
+    assert len(list((tmp_path / "assets").glob("[0-9][0-9][0-9]-*"))) == 1
 
 
 def test_embed_and_none_modes(tmp_path: Path, httpx_mock) -> None:
@@ -113,19 +113,42 @@ def test_download_concurrency_never_exceeds_five(tmp_path: Path, httpx_mock) -> 
     assert maximum == 5
 
 
-def test_existing_assets_are_reused_without_network(tmp_path: Path, httpx_mock) -> None:
-    assets = tmp_path / "assets"
-    assets.mkdir()
-    existing = assets / "001-deadbeef.jpg"
-    existing.write_bytes(b"cached")
+def test_existing_assets_are_reused_only_for_matching_source(tmp_path: Path, httpx_mock) -> None:
+    url = "https://pbs.twimg.com/original.jpg"
+    httpx_mock.add_response(content=b"original", headers={"Content-Type": "image/jpeg"})
+    first, _ = localize_media(_document([url]), tmp_path, "local")
 
-    document, warnings = localize_media(
-        _document(["https://pbs.twimg.com/unreachable.jpg"]), tmp_path, "local"
-    )
+    second, warnings = localize_media(_document([url]), tmp_path, "local")
 
-    assert document.media[0].local_path == "assets/001-deadbeef.jpg"
+    assert second.media[0].local_path == first.media[0].local_path
     assert warnings == []
-    assert httpx_mock.get_requests() == []
+    assert len(httpx_mock.get_requests()) == 1
+
+
+def test_existing_assets_from_different_source_are_not_reused(tmp_path: Path, httpx_mock) -> None:
+    httpx_mock.add_response(content=b"old", headers={"Content-Type": "image/jpeg"})
+    httpx_mock.add_response(content=b"new", headers={"Content-Type": "image/jpeg"})
+    first, _ = localize_media(_document(["https://example.com/old.jpg"]), tmp_path, "local")
+
+    second, warnings = localize_media(_document(["https://example.com/new.jpg"]), tmp_path, "local")
+
+    assert first.media[0].local_path != second.media[0].local_path
+    assert (tmp_path / second.media[0].local_path).read_bytes() == b"new"
+    assert warnings == []
+
+
+def test_corrupted_cached_asset_is_downloaded_again(tmp_path: Path, httpx_mock) -> None:
+    url = "https://example.com/image.jpg"
+    httpx_mock.add_response(content=b"correct", headers={"Content-Type": "image/jpeg"})
+    httpx_mock.add_response(content=b"correct", headers={"Content-Type": "image/jpeg"})
+    first, _ = localize_media(_document([url]), tmp_path, "local")
+    (tmp_path / first.media[0].local_path).write_bytes(b"corrupt")
+
+    second, warnings = localize_media(_document([url]), tmp_path, "local")
+
+    assert (tmp_path / second.media[0].local_path).read_bytes() == b"correct"
+    assert warnings == []
+    assert len(httpx_mock.get_requests()) == 2
 # WeChat image URLs require a stable Referer and declare format in wx_fmt.
 def test_wechat_media_headers_and_extension_policy() -> None:
     url = "https://mmbiz.qpic.cn/mmbiz/image?wx_fmt=png"
