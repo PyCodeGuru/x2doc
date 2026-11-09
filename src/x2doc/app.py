@@ -25,6 +25,7 @@ from x2doc.fetchers.syndication import is_incomplete_syndication_payload
 from x2doc.media import ImageMode, localize_media
 from x2doc.models import ConversionResult, Document
 from x2doc.network import NetworkPolicy, parse_no_proxy_domains, resolve_proxy
+from x2doc.parsers.mirror_json import validate_fxtwitter_article
 from x2doc.platforms import adapter_for
 from x2doc.renderers.markdown import render_markdown
 from x2doc.renderers.pdf import render_pdf
@@ -153,6 +154,9 @@ def convert(
                 document=document.model_dump(mode="json"),
             ),
         )
+
+    if document.fetch_path == "fxtwitter":
+        validate_fxtwitter_article(document.raw)
 
     output_dir = build_output_dir(Path(out), document)
     if output_dir.exists() and not overwrite:

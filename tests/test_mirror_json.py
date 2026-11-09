@@ -1,8 +1,15 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
+from x2doc.errors import RenderError
 from x2doc.models import CodeBlock, HeadingBlock, ListBlock
-from x2doc.parsers.mirror_json import parse_fxtwitter_tweet, parse_vxtwitter_tweet
+from x2doc.parsers.mirror_json import (
+    parse_fxtwitter_tweet,
+    parse_vxtwitter_tweet,
+    validate_fxtwitter_article,
+)
 from x2doc.renderers.markdown import render_markdown
 
 
@@ -84,3 +91,16 @@ def test_vxtwitter_normalizes_core_fields_and_media() -> None:
     assert document.author.handle == "user"
     assert document.media[0].original_url == "https://pbs.twimg.com/a.jpg"
     assert document.metrics == {"likes": 2, "replies": 3, "retweets": 4}
+
+
+def test_article_with_unsupported_embeds_is_not_silently_accepted() -> None:
+    raw = {"tweet": {"article": {"content": {"entityMap": [
+        {"key": "1", "value": {"type": "MEDIA", "data": {}}},
+        {"key": "2", "value": {"type": "TWEET", "data": {}}},
+    ], "blocks": [
+        {"type": "atomic", "entityRanges": [{"key": 1}]},
+        {"type": "atomic", "entityRanges": [{"key": 2}]},
+    ]}}}}
+
+    with pytest.raises(RenderError, match=r"MEDIA.*TWEET"):
+        validate_fxtwitter_article(raw)

@@ -26,7 +26,46 @@ _SHANGHAI = ZoneInfo("Asia/Shanghai")
 _FENCE = re.compile(r"^```([^\n]*)\n(.*)\n```$", re.DOTALL)
 
 
+def validate_fxtwitter_article(raw: dict[str, Any]) -> None:
+    """Reject article elements that the current renderer would silently omit."""
+    tweet = raw.get("tweet")
+    article = tweet.get("article") if isinstance(tweet, dict) else None
+    content = article.get("content") if isinstance(article, dict) else None
+    if not isinstance(content, dict):
+        return
+    entities = {
+        str(item.get("key")): item.get("value")
+        for item in content.get("entityMap", [])
+        if isinstance(item, dict)
+    }
+    unsupported: set[str] = set()
+    for block in content.get("blocks", []):
+        if not isinstance(block, dict) or block.get("type") != "atomic":
+            continue
+        ranges = block.get("entityRanges") or []
+        value = (
+            entities.get(str(ranges[0].get("key")))
+            if ranges and isinstance(ranges[0], dict)
+            else None
+        )
+        if not isinstance(value, dict):
+            unsupported.add("UNKNOWN")
+            continue
+        kind = str(value.get("type") or "UNKNOWN")
+        data = value.get("data") if isinstance(value.get("data"), dict) else {}
+        markdown = data.get("markdown")
+        if (
+            kind != "MARKDOWN"
+            or not isinstance(markdown, str)
+            or not _FENCE.match(markdown.strip())
+        ):
+            unsupported.add(kind)
+    if unsupported:
+        raise RenderError("Article 包含尚不能完整转换的内容：" + ", ".join(sorted(unsupported)))
+
+
 def parse_fxtwitter_tweet(raw: dict[str, Any], source_url: str, fetched_at: datetime) -> Document:
+    validate_fxtwitter_article(raw)
     tweet = raw.get("tweet")
     if not isinstance(tweet, dict):
         raise RenderError("FxTwitter 响应缺少 tweet 对象")
